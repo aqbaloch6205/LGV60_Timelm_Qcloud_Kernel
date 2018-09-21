@@ -1148,27 +1148,8 @@ static bool tcp_pacing_check(const struct sock *sk)
 	       hrtimer_is_queued(&tcp_sk(sk)->pacing_timer);
 }
 
-#ifdef CONFIG_LGP_DATA_TCPIP_MPTCP
-void tcp_update_skb_after_send(struct tcp_sock *tp, struct sk_buff *skb)
-#else
-static void tcp_update_skb_after_send(struct tcp_sock *tp, struct sk_buff *skb)
-#endif
-{
-	skb->skb_mstamp_ns = tp->tcp_wstamp_ns;
-	list_move_tail(&skb->tcp_tsorted_anchor, &tp->tsorted_sent_queue);
-}
 
-/* This routine actually transmits TCP packets queued in by
- * tcp_do_sendmsg().  This is used by both the initial
- * transmission and possible later retransmissions.
- * All SKB's seen here are completely headerless.  It is our
- * job to build the TCP header, and pass the packet down to
- * IP so it can do the same plus pass the packet off to the
- * device.
- *
- * We are working here with either a clone of the original
- * SKB, or a fresh unique copy made by the retransmit engine.
- */
+
 static int __tcp_transmit_skb(struct sock *sk, struct sk_buff *skb,
 			      int clone_it, gfp_t gfp_mask, u32 rcv_nxt)
 {
@@ -1326,7 +1307,7 @@ static int __tcp_transmit_skb(struct sock *sk, struct sk_buff *skb,
 		err = net_xmit_eval(err);
 	}
 	if (!err && oskb) {
-		tcp_update_skb_after_send(tp, oskb);
+		tcp_update_skb_after_send(sk, oskb);
 		tcp_rate_skb_sent(sk, oskb);
 	}
 	return err;
@@ -2620,7 +2601,7 @@ static bool tcp_write_xmit(struct sock *sk, unsigned int mss_now, int nonagle,
 
 		if (unlikely(tp->repair) && tp->repair_queue == TCP_SEND_QUEUE) {
 			/* "skb_mstamp" is used as a start point for the retransmit timer */
-			tcp_update_skb_after_send(tp, skb);
+			tcp_update_skb_after_send(sk, skb);
 			goto repair; /* Skip network transmission */
 		}
 
@@ -3252,7 +3233,7 @@ start:
 		} tcp_skb_tsorted_restore(skb);
 
 		if (!err) {
-			tcp_update_skb_after_send(tp, skb);
+			tcp_update_skb_after_send(sk, skb);
 			tcp_rate_skb_sent(sk, skb);
 		}
 	} else {
