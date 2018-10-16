@@ -580,6 +580,19 @@ static int inet6_dump_fib(struct sk_buff *skb, struct netlink_callback *cb)
 	struct hlist_head *head;
 	int res = 0;
 
+	if (cb->strict_check) {
+		int err;
+
+		err = ip_valid_fib_dump_req(net, nlh, &arg.filter, cb);
+		if (err < 0)
+			return err;
+	} else if (nlmsg_len(nlh) >= sizeof(struct rtmsg)) {
+		struct rtmsg *rtm = nlmsg_data(nlh);
+
+		if (rtm->rtm_flags & RTM_F_PREFIX)
+			arg.filter.flags = RTM_F_PREFIX;
+	}
+
 	s_h = cb->args[0];
 	s_e = cb->args[1];
 
