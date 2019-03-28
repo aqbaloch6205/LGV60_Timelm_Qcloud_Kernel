@@ -3006,6 +3006,134 @@ out:
 	return err;
 }
 
+static bool fib6_is_reject(u32 flags, struct net_device *dev, int addr_type)
+{
+	if ((flags & RTF_REJECT) ||
+	    (dev && (dev->flags & IFF_LOOPBACK) &&
+	     !(addr_type & IPV6_ADDR_LOOPBACK) &&
+	     !(flags & RTF_LOCAL)))
+		return true;
+
+	return false;
+}
+
+int fib6_nh_init(struct net *net, struct fib6_nh *fib6_nh,
+		 struct fib6_config *cfg, gfp_t gfp_flags,
+		 struct netlink_ext_ack *extack)
+{
+	struct net_device *dev = NULL;
+	struct inet6_dev *idev = NULL;
+	int addr_type;
+	int err;
+
+	fib6_nh->fib_nh_family = AF_INET6;
+
+	err = -ENODEV;
+	if (cfg->fc_ifindex) {
+		dev = dev_get_by_index(net, cfg->fc_ifindex);
+		if (!dev)
+			goto out;
+		idev = in6_dev_get(dev);
+		if (!idev)
+			goto out;
+	}
+
+	if (cfg->fc_flags & RTNH_F_ONLINK) {
+		if (!dev) {
+			NL_SET_ERR_MSG(extack,
+				       "Nexthop device required for onlink");
+			goto out;
+		}
+
+		if (!(dev->flags & IFF_UP)) {
+			NL_SET_ERR_MSG(extack, "Nexthop device is not up");
+			err = -ENETDOWN;
+			goto out;
+		}
+
+		fib6_nh->fib_nh_flags |= RTNH_F_ONLINK;
+	}
+
+	fib6_nh->fib_nh_weight = 1;
+
+	/* We cannot add true routes via loopback here,
+	 * they would result in kernel looping; promote them to reject routes
+	 */
+	addr_type = ipv6_addr_type(&cfg->fc_dst);
+	if (fib6_is_reject(cfg->fc_flags, dev, addr_type)) {
+		/* hold loopback dev/idev if we haven't done so. */
+		if (dev != net->loopback_dev) {
+			if (dev) {
+				dev_put(dev);
+				in6_dev_put(idev);
+			}
+			dev = net->loopback_dev;
+			dev_hold(dev);
+			idev = in6_dev_get(dev);
+			if (!idev) {
+				err = -ENODEV;
+				goto out;
+			}
+		}
+		goto set_dev;
+	}
+
+	if (cfg->fc_flags & RTF_GATEWAY) {
+		err = ip6_validate_gw(net, cfg, &dev, &idev, extack);
+		if (err)
+			goto out;
+
+		fib6_nh->fib_nh_gw6 = cfg->fc_gateway;
+		fib6_nh->fib_nh_has_gw = 1;
+	}
+
+	err = -ENODEV;
+	if (!dev)
+		goto out;
+
+	if (idev->cnf.disable_ipv6) {
+		NL_SET_ERR_MSG(extack, "IPv6 is disabled on nexthop device");
+		err = -EACCES;
+		goto out;
+	}
+
+	if (!(dev->flags & IFF_UP) && !cfg->fc_ignore_dev_down) {
+		NL_SET_ERR_MSG(extack, "Nexthop device is not up");
+		err = -ENETDOWN;
+		goto out;
+	}
+
+	if (!(cfg->fc_flags & (RTF_LOCAL | RTF_ANYCAST)) &&
+	    !netif_carrier_ok(dev))
+		fib6_nh->fib_nh_flags |= RTNH_F_LINKDOWN;
+
+	err = fib_nh_common_init(&fib6_nh->nh_common, cfg->fc_encap,
+				 cfg->fc_encap_type, cfg, gfp_flags, extack);
+	if (err)
+		goto out;
+set_dev:
+	fib6_nh->fib_nh_dev = dev;
+	fib6_nh->fib_nh_oif = dev->ifindex;
+	err = 0;
+out:
+	if (idev)
+		in6_dev_put(idev);
+
+	if (err) {
+		lwtstate_put(fib6_nh->fib_nh_lws);
+		fib6_nh->fib_nh_lws = NULL;
+		if (dev)
+			dev_put(dev);
+	}
+
+	return err;
+}
+
+void fib6_nh_release(struct fib6_nh *fib6_nh)
+{
+	fib_nh_common_release(&fib6_nh->nh_common);
+}
+
 static struct fib6_info *ip6_route_info_create(struct fib6_config *cfg,
 					      gfp_t gfp_flags,
 					      struct netlink_ext_ack *extack)
