@@ -522,8 +522,8 @@ int fib_nh_init(struct net *net, struct fib_nh *nh,
 		return err;
 
 	nh->fib_nh_oif = cfg->fc_oif;
-	if (cfg->fc_gw) {
-		nh->fib_nh_gw4 = cfg->fc_gw;
+	if (cfg->fc_gw_family == AF_INET) {
+		nh->fib_nh_gw4 = cfg->fc_gw4;
 		nh->fib_nh_gw_family = AF_INET;
 	}
 	nh->fib_nh_flags = cfg->fc_flags;
@@ -592,8 +592,11 @@ static int fib_get_nhs(struct fib_info *fi, struct rtnexthop *rtnh,
 			struct nlattr *nla, *attrs = rtnh_attrs(rtnh);
 
 			nla = nla_find(attrs, attrlen, RTA_GATEWAY);
-			nexthop_nh->fib_nh_gw = nla ? nla_get_in_addr(nla) : 0;
-#ifdef CONFIG_IP_ROUTE_CLASSID
+			if (nla) {
+				fib_cfg.fc_gw_family = AF_INET;
+				fib_cfg.fc_gw4 = nla_get_in_addr(nla);
+			}
+			
 			nla = nla_find(attrs, attrlen, RTA_FLOW);
 			nexthop_nh->nh_tclassid = nla ? nla_get_u32(nla) : 0;
 			if (nexthop_nh->nh_tclassid)
@@ -631,6 +634,28 @@ static int fib_get_nhs(struct fib_info *fi, struct rtnexthop *rtnh,
 
 err_inval:
 	ret = -EINVAL;
+	if (cfg->fc_oif && fi->fib_nh->nh_oif != cfg->fc_oif) {
+		NL_SET_ERR_MSG(extack,
+			       "Nexthop device index does not match RTA_OIF");
+		goto errout;
+	}
+	if (cfg->fc_gw_family) {
+		if (cfg->fc_gw_family != fi->fib_nh->fib_nh_gw_family ||
+		    (cfg->fc_gw_family == AF_INET &&
+		     fi->fib_nh->fib_nh_gw4 != cfg->fc_gw4)) {
+			NL_SET_ERR_MSG(extack,
+				       "Nexthop gateway does not match RTA_GATEWAY");
+			goto errout;
+		}
+	}
+#ifdef CONFIG_IP_ROUTE_CLASSID
+	if (cfg->fc_flow && fi->fib_nh->nh_tclassid != cfg->fc_flow) {
+		NL_SET_ERR_MSG(extack,
+			       "Nexthop class id does not match RTA_FLOW");
+		goto errout;
+	}
+#endif
+	ret = 0;
 errout:
 	return ret;
 }
@@ -719,7 +744,7 @@ int fib_nh_match(struct fib_config *cfg, struct fib_info *fi,
 	if (cfg->fc_priority && cfg->fc_priority != fi->fib_priority)
 		return 1;
 
-	if (cfg->fc_oif || cfg->fc_gw) {
+	if (cfg->fc_oif || cfg->fc_gw_family) {
 		if (cfg->fc_encap) {
 			if (fib_encap_match(cfg->fc_encap_type, cfg->fc_encap,
 					    fi->fib_nh, cfg, extack))
@@ -730,10 +755,16 @@ int fib_nh_match(struct fib_config *cfg, struct fib_info *fi,
 		    cfg->fc_flow != fi->fib_nh->nh_tclassid)
 			return 1;
 #endif
-		if ((!cfg->fc_oif || cfg->fc_oif == fi->fib_nh->fib_nh_oif) &&
-		    (!cfg->fc_gw  || cfg->fc_gw == fi->fib_nh->fib_nh_gw4))
-			return 0;
-		return 1;
+		if ((cfg->fc_oif && cfg->fc_oif != fi->fib_nh->fib_nh_oif) ||
+		    (cfg->fc_gw_family &&
+		     cfg->fc_gw_family != fi->fib_nh->fib_nh_gw_family))
+			return 1;
+
+		if (cfg->fc_gw_family == AF_INET &&
+		    cfg->fc_gw4 != fi->fib_nh->fib_nh_gw4)
+			return 1;
+
+		return 0;
 	}
 
 #ifdef CONFIG_IP_ROUTE_MULTIPATH
@@ -1310,7 +1341,7 @@ struct fib_info *fib_create_info(struct fib_config *cfg,
 	}
 
 	if (fib_props[cfg->fc_type].error) {
-		if (cfg->fc_gw || cfg->fc_oif || cfg->fc_mp) {
+		if (cfg->fc_gw_family || cfg->fc_oif || cfg->fc_mp) {
 			NL_SET_ERR_MSG(extack,
 				       "Gateway, device and multipath can not be specified for this route type");
 			goto err_inval;
