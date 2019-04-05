@@ -2304,9 +2304,10 @@ static int ipv6_route_native_seq_show(struct seq_file *seq, void *v)
 #else
 	seq_puts(seq, "00000000000000000000000000000000 00 ");
 #endif
-	if (rt->fib6_flags & RTF_GATEWAY)
-		seq_printf(seq, "%pi6", &rt->fib6_nh.nh_gw);
-	else
+	if (rt->fib6_nh.fib_nh_gw_family) {
+		flags |= RTF_GATEWAY;
+		seq_printf(seq, "%pi6", &rt->fib6_nh.fib_nh_gw6);
+	} else {
 		seq_puts(seq, "00000000000000000000000000000000");
 
 	dev = rt->fib6_nh.nh_dev;

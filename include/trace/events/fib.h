@@ -65,11 +65,33 @@ TRACE_EVENT(fib_table_lookup,
 		if (nh) {
 			struct net_device *dev;
 
-			p32 = (__be32 *) __entry->saddr;
-			*p32 = nh->nh_saddr;
+		if (nhc) {
+			if (nhc->nhc_gw_family == AF_INET) {
+				p32 = (__be32 *) __entry->gw4;
+				*p32 = nhc->nhc_gw.ipv4;
 
-			p32 = (__be32 *) __entry->gw;
-			*p32 = nh->fib_nh_gw4;
+				in6 = (struct in6_addr *)__entry->gw6;
+				*in6 = in6_zero;
+			} else if (nhc->nhc_gw_family == AF_INET6) {
+				p32 = (__be32 *) __entry->gw4;
+				*p32 = 0;
+
+				in6 = (struct in6_addr *)__entry->gw6;
+				*in6 = nhc->nhc_gw.ipv6;
+			} else {
+				p32 = (__be32 *) __entry->gw4;
+				*p32 = 0;
+
+				in6 = (struct in6_addr *)__entry->gw6;
+				*in6 = in6_zero;
+			}
+		} else {
+			p32 = (__be32 *) __entry->gw4;
+			*p32 = 0;
+
+			in6 = (struct in6_addr *)__entry->gw6;
+			*in6 = in6_zero;
+		}
 
 			dev = nh->fib_nh_dev;
 			__assign_str(name, dev ? dev->name : "-");
