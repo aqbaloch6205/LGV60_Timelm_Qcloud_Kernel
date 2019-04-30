@@ -76,6 +76,28 @@ struct fnhe_hash_bucket {
 #define FNHE_HASH_SIZE		(1 << FNHE_HASH_SHIFT)
 #define FNHE_RECLAIM_DEPTH	5
 
+struct fib_nh_common {
+	struct net_device	*nhc_dev;
+	int			nhc_oif;
+	unsigned int		nhc_flags;
+	struct lwtunnel_state	*nhc_lwtstate;
+	unsigned char		nhc_scope;
+	u8			nhc_family;
+	u8			nhc_has_gw:1,
+				unused:7;
+	union {
+		__be32          ipv4;
+		struct in6_addr ipv6;
+	} nhc_gw;
+
+	int			nhc_weight;
+	atomic_t		nhc_upper_bound;
+
+	/* v4 specific, but allows fib6_nh with v4 routes */
+	struct rtable __rcu * __percpu *nhc_pcpu_rth_output;
+	struct rtable __rcu     *nhc_rth_input;
+};
+
 struct fib_nh {
 	struct net_device	*fib_nh_dev;
 	struct hlist_node	nh_hash;
@@ -93,8 +115,6 @@ struct fib_nh {
 	__be32			fib_nh_gw4;
 	__be32			nh_saddr;
 	int			nh_saddr_genid;
-	struct rtable __rcu * __percpu *nh_pcpu_rth_output;
-	struct rtable __rcu	*nh_rth_input;
 	struct fnhe_hash_bucket	__rcu *nh_exceptions;
 	struct lwtunnel_state	*fib_nh_lws;
 };
