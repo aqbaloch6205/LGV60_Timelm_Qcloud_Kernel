@@ -96,6 +96,7 @@ struct fib_nh_common {
 	/* v4 specific, but allows fib6_nh with v4 routes */
 	struct rtable __rcu * __percpu *nhc_pcpu_rth_output;
 	struct rtable __rcu     *nhc_rth_input;
+	struct fnhe_hash_bucket	__rcu *nhc_exceptions;
 };
 
 struct fib_nh {
@@ -115,8 +116,18 @@ struct fib_nh {
 	__be32			fib_nh_gw4;
 	__be32			nh_saddr;
 	int			nh_saddr_genid;
-	struct fnhe_hash_bucket	__rcu *nh_exceptions;
-	struct lwtunnel_state	*fib_nh_lws;
+#define fib_nh_family		nh_common.nhc_family
+#define fib_nh_dev		nh_common.nhc_dev
+#define fib_nh_oif		nh_common.nhc_oif
+#define fib_nh_flags		nh_common.nhc_flags
+#define fib_nh_lws		nh_common.nhc_lwtstate
+#define fib_nh_scope		nh_common.nhc_scope
+#define fib_nh_family		nh_common.nhc_family
+#define fib_nh_has_gw		nh_common.nhc_has_gw
+#define fib_nh_gw4		nh_common.nhc_gw.ipv4
+#define fib_nh_gw6		nh_common.nhc_gw.ipv6
+#define fib_nh_weight		nh_common.nhc_weight
+#define fib_nh_upper_bound	nh_common.nhc_upper_bound
 };
 
 /*
