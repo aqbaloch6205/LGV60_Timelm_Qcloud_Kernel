@@ -2121,18 +2121,15 @@ brd_input:
 	RT_CACHE_STAT_INC(in_brd);
 
 local_input:
-	do_cache = false;
-	if (res->fi) {
-		if (!itag) {
-			struct fib_nh_common *nhc = FIB_RES_NHC(*res);
+	do_cache &= res->fi && !itag;
+	if (do_cache) {
+		struct fib_nh_common *nhc = FIB_RES_NHC(*res);
 
-			rth = rcu_dereference(nhc->nhc_rth_input);
-			if (rt_cache_valid(rth)) {
-				skb_dst_set_noref(skb, &rth->dst);
-				err = 0;
-				goto out;
-			}
-			do_cache = true;
+		rth = rcu_dereference(nhc->nhc_rth_input);
+		if (rt_cache_valid(rth)) {
+			skb_dst_set_noref(skb, &rth->dst);
+			err = 0;
+			goto out;
 		}
 	}
 

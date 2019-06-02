@@ -1413,8 +1413,6 @@ int fib_dump_info(struct sk_buff *skb, u32 portid, u32 seq, int event,
 		    nla_put_u32(skb, RTA_OIF, fi->fib_nh->fib_nh_oif))
 			goto nla_put_failure;
 		if (fi->fib_nh->fib_nh_flags & RTNH_F_LINKDOWN) {
-			struct in_device *in_dev;
-
 			rcu_read_lock();
 			in_dev = __in_dev_get_rcu(fi->fib_nh->fib_nh_dev);
 			if (in_dev &&
@@ -1449,8 +1447,6 @@ int fib_dump_info(struct sk_buff *skb, u32 portid, u32 seq, int event,
 
 			rtnh->rtnh_flags = nh->fib_nh_flags & 0xFF;
 			if (nh->fib_nh_flags & RTNH_F_LINKDOWN) {
-				struct in_device *in_dev;
-
 				rcu_read_lock();
 				in_dev = __in_dev_get_rcu(nh->fib_nh_dev);
 				if (in_dev &&
