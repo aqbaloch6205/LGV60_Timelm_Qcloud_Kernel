@@ -160,7 +160,6 @@ struct fib_info {
 	bool			fib_nh_is_v6;
 	struct rcu_head		rcu;
 	struct fib_nh		fib_nh[0];
-#define fib_dev		fib_nh[0].fib_nh_dev
 };
 
 
@@ -195,12 +194,6 @@ struct fib_result_nl {
 	unsigned char	scope;
 	int             err;
 };
-
-#ifdef CONFIG_IP_ROUTE_MULTIPATH
-#define FIB_RES_NH(res)		((res).fi->fib_nh[(res).nh_sel])
-#else /* CONFIG_IP_ROUTE_MULTIPATH */
-#define FIB_RES_NH(res)		((res).fi->fib_nh[0])
-#endif /* CONFIG_IP_ROUTE_MULTIPATH */
 
 #ifdef CONFIG_IP_MULTIPLE_TABLES
 #define FIB_TABLE_HASHSZ 256
