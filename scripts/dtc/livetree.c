@@ -348,7 +348,8 @@ void append_to_property(struct node *node,
 		d = data_append_data(d, data, len);
 		p->val = d;
 	} else {
-		d = data_append_data(empty_data, data, len);
+		d = data_add_marker(empty_data, type, name);
+		d = data_append_data(d, data, len);
 		p = build_property(name, d, NULL);
 		add_property(node, p);
 	}
@@ -872,8 +873,8 @@ static void generate_label_tree_internal(struct dt_info *dti,
 
 			/* insert it */
 			p = build_property(l->label,
-				data_copy_mem(node->fullpath,
-						strlen(node->fullpath) + 1),
+				data_copy_escape_string(node->fullpath,
+						strlen(node->fullpath)),
 				NULL);
 			add_property(an, p);
 		}

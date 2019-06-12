@@ -40,8 +40,23 @@ static uint32_t overlay_get_target_phandle(const void *fdto, int fragment)
 	return fdt32_to_cpu(*val);
 }
 
-int fdt_overlay_target_offset(const void *fdt, const void *fdto,
-			      int fragment_offset, char const **pathp)
+/**
+ * overlay_get_target - retrieves the offset of a fragment's target
+ * @fdt: Base device tree blob
+ * @fdto: Device tree overlay blob
+ * @fragment: node offset of the fragment in the overlay
+ * @pathp: pointer which receives the path of the target (or NULL)
+ *
+ * overlay_get_target() retrieves the target offset in the base
+ * device tree of a fragment, no matter how the actual targeting is
+ * done (through a phandle or a path)
+ *
+ * returns:
+ *      the targeted node offset in the base device tree
+ *      Negative error code on error
+ */
+static int overlay_get_target(const void *fdt, const void *fdto,
+			      int fragment, char const **pathp)
 {
 	uint32_t phandle;
 	const char *path = NULL;
@@ -819,6 +834,10 @@ int fdt_overlay_apply(void *fdt, void *fdto)
 
 	FDT_RO_PROBE(fdt);
 	FDT_RO_PROBE(fdto);
+
+	ret = fdt_find_max_phandle(fdt, &delta);
+	if (ret)
+		goto err;
 
 	ret = overlay_adjust_local_phandles(fdto, delta);
 	if (ret)

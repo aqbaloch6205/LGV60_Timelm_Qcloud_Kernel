@@ -102,11 +102,7 @@ extern "C" {
 	/* FDT_ERR_BADFLAGS: The function was passed a flags field that
 	 * contains invalid flags or an invalid combination of flags. */
 
-#define FDT_ERR_ALIGNMENT	19
-	/* FDT_ERR_ALIGNMENT: The device tree base address is not 8-byte
-	 * aligned. */
-
-#define FDT_ERR_MAX		19
+#define FDT_ERR_MAX		18
 
 /* constants */
 #define FDT_MAX_PHANDLE 0xfffffffe
@@ -143,6 +139,16 @@ static inline uint32_t fdt32_ld(const fdt32_t *p)
 		| bp[3];
 }
 
+static inline void fdt32_st(void *property, uint32_t value)
+{
+	uint8_t *bp = property;
+
+	bp[0] = value >> 24;
+	bp[1] = (value >> 16) & 0xff;
+	bp[2] = (value >> 8) & 0xff;
+	bp[3] = value & 0xff;
+}
+
 static inline uint64_t fdt64_ld(const fdt64_t *p)
 {
 	const uint8_t *bp = (const uint8_t *)p;
@@ -155,6 +161,20 @@ static inline uint64_t fdt64_ld(const fdt64_t *p)
 		| ((uint64_t)bp[5] << 16)
 		| ((uint64_t)bp[6] << 8)
 		| bp[7];
+}
+
+static inline void fdt64_st(void *property, uint64_t value)
+{
+	uint8_t *bp = property;
+
+	bp[0] = value >> 56;
+	bp[1] = (value >> 48) & 0xff;
+	bp[2] = (value >> 40) & 0xff;
+	bp[3] = (value >> 32) & 0xff;
+	bp[4] = (value >> 24) & 0xff;
+	bp[5] = (value >> 16) & 0xff;
+	bp[6] = (value >> 8) & 0xff;
+	bp[7] = value & 0xff;
 }
 
 /**********************************************************************/
@@ -383,7 +403,8 @@ static inline uint32_t fdt_get_max_phandle(const void *fdt)
  * highest phandle value in the device tree blob) will be returned in the
  * @phandle parameter.
  *
- * Return: 0 on success or a negative error-code on failure
+ * Returns:
+ *   0 on success or a negative error-code on failure
  */
 int fdt_generate_phandle(const void *fdt, uint32_t *phandle);
 
@@ -1409,7 +1430,7 @@ int fdt_nop_node(void *fdt, int nodeoffset);
 
 /**
  * fdt_create_with_flags - begin creation of a new fdt
- * @buf: pointer to memory allocated where fdt will be created
+ * @fdt: pointer to memory allocated where fdt will be created
  * @bufsize: size of the memory space at fdt
  * @flags: a valid combination of FDT_CREATE_FLAG_ flags, or 0.
  *
@@ -1427,7 +1448,7 @@ int fdt_create_with_flags(void *buf, int bufsize, uint32_t flags);
 
 /**
  * fdt_create - begin creation of a new fdt
- * @buf: pointer to memory allocated where fdt will be created
+ * @fdt: pointer to memory allocated where fdt will be created
  * @bufsize: size of the memory space at fdt
  *
  * fdt_create() is equivalent to fdt_create_with_flags() with flags=0.
