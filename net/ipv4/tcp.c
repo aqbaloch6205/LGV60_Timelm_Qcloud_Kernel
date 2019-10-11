@@ -480,7 +480,7 @@ void tcp_init_sock(struct sock *sk)
 	icsk->icsk_sync_mss = tcp_sync_mss;
 
 	sk->sk_sndbuf = sock_net(sk)->ipv4.sysctl_tcp_wmem[1];
-	sk->sk_rcvbuf = sock_net(sk)->ipv4.sysctl_tcp_rmem[1];
+	WRITE_ONCE(sk->sk_rcvbuf, sock_net(sk)->ipv4.sysctl_tcp_rmem[1]);
 
 #ifdef CONFIG_LGP_DATA_TCPIP_MPTCP
 	tp->ops = &tcp_specific;
@@ -1883,7 +1883,7 @@ int tcp_set_rcvlowat(struct sock *sk, int val)
 
 	val <<= 1;
 	if (val > sk->sk_rcvbuf) {
-		sk->sk_rcvbuf = val;
+		WRITE_ONCE(sk->sk_rcvbuf, val);
 		tcp_sk(sk)->window_clamp = tcp_win_from_space(sk, val);
 	}
 	return 0;
