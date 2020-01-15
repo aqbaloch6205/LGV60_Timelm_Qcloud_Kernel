@@ -18,15 +18,8 @@ ifeq ($(CONFIG_RELOCATABLE), y)
 # Pass --no-apply-dynamic-relocs to restore pre-binutils-2.27 behaviour
 # for relative relocs, since this leads to better Image compression
 # with the relocation offsets always being zero.
-LDFLAGS_vmlinux		+= -Bsymbolic -z notext \
+LDFLAGS_vmlinux		+= -shared -Bsymbolic -z notext \
 			$(call ld-option, --no-apply-dynamic-relocs)
-
-# Pass -shared for bfd and -pie for lld to minimize Image size on both
-ifdef CONFIG_LD_IS_LLD
-LDFLAGS_vmlinux		+= -pie
-else
-LDFLAGS_vmlinux		+= -shared
-endif
 endif
 
 ifeq ($(CONFIG_ARM64_ERRATUM_843419),y)
@@ -39,11 +32,8 @@ endif
 
 KBUILD_DEFCONFIG := defconfig
 
-# Check for binutils support for specific extensions
-lseinstr := $(call as-instr,.arch_extension lse,-DCONFIG_AS_LSE=1)
-
-ifeq ($(CONFIG_ARM64_LSE_ATOMICS), y)
-  ifeq ($(lseinstr),)
+ifeq ($(CONFIG_ARM64_USE_LSE_ATOMICS), y)
+  ifneq ($(CONFIG_ARM64_LSE_ATOMICS), y)
 $(warning LSE atomics not supported by binutils)
   endif
 endif
@@ -62,36 +52,14 @@ $(warning Detected assembler with broken .inst; disassembly will be unreliable)
   endif
 endif
 
-ifeq ($(cc-name),clang)
-KBUILD_CFLAGS	+= -mno-implicit-float
-else
 KBUILD_CFLAGS	+= -mgeneral-regs-only
-endif
-KBUILD_CFLAGS	+= $(lseinstr) $(brokengasinst) $(compat_vdso) $(cc_has_k_constraint)
-
-ifeq ($(CONFIG_ARCH_KONA), y)
-    ifeq ($(cc-name),clang)
-        KBUILD_CFLAGS   += -mcpu=cortex-a55
-        KBUILD_AFLAGS   += -mcpu=cortex-a55
-        ifeq ($(CONFIG_LD_IS_LLD), y)
-            KBUILD_LDFLAGS  += -mllvm -mcpu=cortex-a55
-        endif
-    else
-        KBUILD_CFLAGS   += -mcpu=cortex-a77.cortex-a55
-        KBUILD_AFLAGS   += -mcpu=cortex-a77.cortex-a55
-    endif
-endif
+KBUILD_CFLAGS	+= $(brokengasinst) $(compat_vdso) $(cc_has_k_constraint)
 KBUILD_CFLAGS	+= -fno-asynchronous-unwind-tables
 KBUILD_CFLAGS	+= $(call cc-disable-warning, psabi)
-KBUILD_AFLAGS	+= $(lseinstr) $(brokengasinst) $(compat_vdso)
+KBUILD_AFLAGS	+= $(brokengasinst) $(compat_vdso)
 
 KBUILD_CFLAGS	+= $(call cc-option,-mabi=lp64)
 KBUILD_AFLAGS	+= $(call cc-option,-mabi=lp64)
-
-ifeq ($(CONFIG_AS_HAS_ARMV8_2), y)
-# make sure to pass the newest target architecture to -march.
-asm-arch := armv8.2-a
-endif
 
 ifeq ($(CONFIG_SHADOW_CALL_STACK), y)
 KBUILD_CFLAGS	+= -ffixed-x18
@@ -181,9 +149,7 @@ KBUILD_TARGET := $(KBUILD_IMAGE)
 KBUILD_IMAGE  := $(boot)/$(KBUILD_IMAGE)
 endif
 
-KBUILD_DTBO_IMG := dtbo.img
-
-KBUILD_DTB_IMG := dtb.img
+KBUILD_DTBS	:= dtbs
 
 ifeq ($(CONFIG_BUILD_ARM64_DT_OVERLAY),y)
 export DTC_FLAGS := -@
@@ -200,22 +166,22 @@ Image.%: Image
 zinstall install:
 	$(Q)$(MAKE) $(build)=$(boot) $@
 
+%.dtb: scripts
+	$(Q)$(MAKE) $(build)=$(boot)/dts $(boot)/dts/$@
+
+PHONY += dtbs dtbs_install
+
+dtbs: prepare scripts
+	$(Q)$(MAKE) $(build)=$(boot)/dts
+
+dtbs_install:
+	$(Q)$(MAKE) $(dtbinst)=$(boot)/dts
+
 Image-dtb: vmlinux scripts dtbs
 	$(Q)$(MAKE) $(build)=$(boot) $(boot)/$@
 
 Image.gz-dtb: vmlinux scripts dtbs Image.gz
 	$(Q)$(MAKE) $(build)=$(boot) $(boot)/$@
-
-ifeq ($(CONFIG_BUILD_ARM64_DT_OVERLAY),y)
-$(KBUILD_DTBO_IMG): dtbs
-	$(Q)$(MAKE) $(build)=$(boot) $(boot)/$@
-
-all: $(KBUILD_DTBO_IMG)
-$(KBUILD_DTB_IMG): dtbs
-	$(Q)$(MAKE) $(build)=$(boot) $(boot)/$@
-
-all: $(KBUILD_DTB_IMG)
-endif
 
 PHONY += vdso_install
 vdso_install:
@@ -226,6 +192,7 @@ vdso_install:
 # We use MRPROPER_FILES and CLEAN_FILES now
 archclean:
 	$(Q)$(MAKE) $(clean)=$(boot)
+	$(Q)$(MAKE) $(clean)=$(boot)/dts
 
 ifeq ($(KBUILD_EXTMOD),)
 # We need to generate vdso-offsets.h before compiling certain files in kernel/.
@@ -245,6 +212,8 @@ endif
 define archhelp
   echo  '* Image.gz      - Compressed kernel image (arch/$(ARCH)/boot/Image.gz)'
   echo  '  Image         - Uncompressed kernel image (arch/$(ARCH)/boot/Image)'
+  echo  '* dtbs          - Build device tree blobs for enabled boards'
+  echo  '  dtbs_install  - Install dtbs to $(INSTALL_DTBS_PATH)'
   echo  '  install       - Install uncompressed kernel'
   echo  '  zinstall      - Install compressed kernel'
   echo  '                  Install using (your) ~/bin/installkernel or'
