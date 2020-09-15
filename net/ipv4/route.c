@@ -814,8 +814,10 @@ static void __ip_do_redirect(struct rtable *rt, struct sk_buff *skb, struct flow
 			neigh_event_send(n, NULL);
 		} else {
 			if (fib_lookup(net, fl4, &res, 0) == 0) {
-				struct fib_nh_common *nhc = FIB_RES_NHC(res);
+				struct fib_nh_common *nhc;
 
+				fib_select_path(net, &res, fl4, skb);
+				nhc = FIB_RES_NHC(res);
 				update_or_create_fnhe(nhc, fl4->daddr, new_gw,
 						0, false,
 						jiffies + ip_rt_gc_timeout);
@@ -1053,9 +1055,11 @@ static void __ip_rt_update_pmtu(struct rtable *rt, struct flowi4 *fl4, u32 mtu)
 		return;
 
 	rcu_read_lock();
-	if (fib_lookup(dev_net(dst->dev), fl4, &res, 0) == 0) {
-		struct fib_nh_common *nhc = FIB_RES_NHC(res);
+	if (fib_lookup(net, fl4, &res, 0) == 0) {
+		struct fib_nh_common *nhc;
 
+		fib_select_path(net, &res, fl4, NULL);
+		nhc = FIB_RES_NHC(res);
 		update_or_create_fnhe(nhc, fl4->daddr, 0, mtu, lock,
 				      jiffies + ip_rt_mtu_expires);
 	}
