@@ -340,7 +340,7 @@ struct bias_config {
 	int	bias_kohms;
 };
 
-static int fg_gen4_debug_mask;
+static int fg_gen4_debug_mask = FG_STATUS | FG_FVSS | FG_POWER_SUPPLY;
 
 static bool fg_profile_dump;
 static ssize_t profile_dump_show(struct device *dev, struct device_attribute
@@ -1075,6 +1075,46 @@ static int fg_gen4_get_prop_capacity_raw(struct fg_gen4_chip *chip, int *val)
 	*val = (*val * 10000) / 0xFFFF;
 
 	return 0;
+}
+
+static int fg_gen4_get_prop_soc_decimal_rate(struct fg_gen4_chip *chip, int *val)
+{
+	struct fg_dev *fg = &chip->fg;
+	int i, soc, rc = 0;
+
+	rc = fg_gen4_get_prop_capacity(fg, &soc);
+	if (rc < 0) {
+		pr_err("Failed to get battery capacity, rc=%d\n", rc);
+		return 0;
+	}
+
+	for (i = 0; i < chip->dt.dec_rate_len; i += 2) {
+		if (soc < chip->dt.dec_rate_seq[i]) {
+			*val = chip->dt.dec_rate_seq[i - 1];
+			return 0;
+		}
+	}
+
+	*val = chip->dt.dec_rate_seq[chip->dt.dec_rate_len - 1];
+
+	return 0;
+}
+
+static int fg_gen4_get_prop_soc_decimal(struct fg_gen4_chip *chip, int *val)
+{
+	int rc;
+	int soc_decimal, soc_decimal_rate;
+
+	union power_supply_propval pval = {0,};
+
+	rc = fg_gen4_get_prop_capacity_raw(chip, &pval.intval);
+	soc_decimal = pval.intval % 100;
+	rc = fg_gen4_get_prop_soc_decimal_rate(chip, &soc_decimal_rate);
+	if (soc_decimal + soc_decimal_rate >= 100)
+		soc_decimal -= soc_decimal_rate;
+
+	*val = soc_decimal;
+	return rc;
 }
 
 static inline void get_esr_meas_current(int curr_ma, u8 *val)
@@ -2300,6 +2340,7 @@ static bool is_profile_load_required(struct fg_gen4_chip *chip)
 			fg->profile_load_status = PROFILE_SKIPPED;
 			return false;
 		}
+
 		profiles_same = memcmp(chip->batt_profile, buf,
 					PROFILE_COMP_LEN) == 0;
 		if (profiles_same) {
@@ -3489,7 +3530,12 @@ static int fg_gen4_validate_soc_scale_mode(struct fg_gen4_chip *chip)
 		pr_err("Failed to get msoc rc=%d\n", rc);
 		goto fail_soc_scale;
 	}
-
+	
+	if (is_low_temp_flag)
+		vbatt_scale_mv = 3400;
+	else
+		vbatt_scale_mv = chip->dt.vbatt_scale_thr_mv;
+	pr_info("get vbatt_scale_mv = %d, current now = %d\n", vbatt_scale_mv, chip->current_now);
 	if (!chip->soc_scale_mode && fg->charge_status ==
 		POWER_SUPPLY_STATUS_DISCHARGING &&
 		chip->vbatt_avg < chip->dt.vbatt_scale_thr_mv) {
@@ -4233,8 +4279,20 @@ static void soc_scale_work(struct work_struct *work)
 		 * timer resolution to catch up the rate of decrement
 		 * of SOC.
 		 */
-		chip->soc_scale_msoc = chip->prev_soc_scale_msoc -
-					soc_thr_percent;
+		calculate_delta_time(&last_change_time, &time_since_last_change_sec);
+		calculate_average_current(chip);
+		/* Calculated average current > 700mA */
+		if (fg->param.batt_ma_avg > 700000)
+			delta_time = time_since_last_change_sec / 20;
+		else
+			delta_time = time_since_last_change_sec / 40;
+
+		if (delta_time < 0)
+			delta_time = 0;
+		soc_changed = min(1, delta_time);
+		fg_dbg(fg, FG_FVSS, "get delta_time = %d, soc_changed =%d, time_since_last_change_sec = %d\n", delta_time, soc_changed, time_since_last_change_sec);
+
+		chip->soc_scale_msoc = chip->prev_soc_scale_msoc - soc_changed;
 		chip->scale_timer = chip->dt.scale_timer_ms /
 				(chip->prev_soc_scale_msoc - soc);
 	}
@@ -4733,7 +4791,7 @@ static int fg_psy_get_property(struct power_supply *psy,
 		pval->intval = chip->calib_level;
 		break;
 	default:
-		pr_err("unsupported property %d\n", psp);
+		pr_debug("unsupported property %d\n", psp);
 		rc = -EINVAL;
 		break;
 	}
@@ -6268,6 +6326,309 @@ static int fg_gen4_parse_dt(struct fg_gen4_chip *chip)
 	return 0;
 }
 
+#define SCALE_SOC 3
+#define DETAL_SOC 1
+//#define FFC_SYS_TERMI_CURRENT -1280000
+static int scale_count;
+extern bool off_charge_flag;
+
+#define SMOOTH_VOLT_LEN         4
+
+struct LowSoc_HighVolt_Smooth{
+	int volt_lim;
+	int time;
+};
+
+struct LowSoc_HighVolt_Smooth lowsoc_highvolt_smooth[SMOOTH_VOLT_LEN] = {
+	{0,    10},
+	{3400, 30},
+	{3500, 45},
+	{3600, 60},
+};
+
+static void fg_battery_soc_smooth_tracking(struct fg_gen4_chip *chip)
+{
+	struct fg_dev *fg = &chip->fg;
+	int delta_time = 0;
+	int soc_changed;
+	int last_batt_soc = fg->param.batt_soc;
+	int time_since_last_change_sec;
+	int last_smooth_batt_soc = fg->param.smooth_batt_soc;
+	int i;
+
+	struct timespec last_change_time = fg->param.last_soc_change_time;
+
+	calculate_delta_time(&last_change_time, &time_since_last_change_sec);
+	pr_info("entry:smooth_batt_soc%d\n", fg->param.smooth_batt_soc);
+
+	/* calculate average ibat */
+	calculate_average_current(chip);
+	if (fg->param.batt_temp > 150) {
+		/* Battery in normal temperture */
+		if (fg->param.batt_ma_avg > 1000000)
+			/* Heavy loading current, ignore battery soc limit*/
+			delta_time = time_since_last_change_sec / 10;
+		else if (fg->param.batt_ma < 0 ||
+				(abs(fg->param.batt_raw_soc - fg->param.batt_soc) > 2))
+			delta_time = time_since_last_change_sec / 20;
+		else
+			delta_time = time_since_last_change_sec / 60;
+	} else {
+		/* Calculated average current > 1000mA */
+		if ((fg->param.batt_ma_avg > 1000000) ||
+				(abs(fg->param.batt_raw_soc - fg->param.batt_soc) > 2))
+			/* Heavy loading current, ignore battery soc limit*/
+			delta_time = time_since_last_change_sec / 10;
+		else
+			delta_time = time_since_last_change_sec / 20;
+	}
+
+	//increase unit_time when low power but high voltage, to prevent cliff fall when low power but high voltage
+	if(fg->param.batt_raw_soc == 0 && last_batt_soc > 1){
+		for(i = SMOOTH_VOLT_LEN; i > 0; i--){
+			if(fg->param.batt_mv > lowsoc_highvolt_smooth[i-1].volt_lim){
+				delta_time = time_since_last_change_sec / lowsoc_highvolt_smooth[i-1].time;
+				break;
+			}
+		}
+	}	
+
+
+	if (delta_time < 0)
+		delta_time = 0;
+
+	soc_changed = min(1, delta_time);
+
+	if (last_batt_soc >= 0) {
+		if (last_batt_soc != 100
+				&& fg->param.batt_raw_soc >= 95
+				&& fg->charge_status == POWER_SUPPLY_STATUS_FULL)
+			// Unlikely status
+			last_batt_soc = last_batt_soc + soc_changed;
+		else if (last_batt_soc < fg->param.batt_raw_soc &&
+			fg->param.batt_ma < 0)
+			/* Battery in charging status
+			* update the soc when resuming device
+			*/
+			last_batt_soc = last_batt_soc + soc_changed;
+		else if (last_batt_soc > fg->param.batt_raw_soc
+					&& fg->param.batt_ma > 0)
+			/* Battery in discharging status
+			* update the soc when resuming device
+			*/
+			last_batt_soc = last_batt_soc - soc_changed;
+	} else {
+		last_batt_soc = fg->param.batt_raw_soc;
+	}
+
+	if (chip->dt.fg_increase_100soc_time) {
+		fg->param.smooth_batt_soc = last_batt_soc + SCALE_SOC;
+		if (fg->param.smooth_batt_soc > 100)
+			fg->param.smooth_batt_soc = 100;
+	}
+
+	if (fg->param.batt_soc != last_batt_soc) {
+		fg->param.batt_soc = last_batt_soc;
+		fg->param.last_soc_change_time = last_change_time;
+		if (chip->dt.fg_increase_100soc_time) {
+			if ((fg->charge_status == POWER_SUPPLY_STATUS_CHARGING) && fg->param.batt_soc > 96 && scale_count < SCALE_SOC) {
+				fg->param.smooth_batt_soc -= DETAL_SOC;
+				fg->param.smooth_full_soc = fg->param.smooth_batt_soc;
+				scale_count++;
+			} else {
+				scale_count = 0;
+				fg->param.smooth_full_soc = 0;
+			}
+		}
+		if (batt_psy_initialized(fg))
+			power_supply_changed(fg->batt_psy);
+	}
+
+	if (chip->dt.fg_increase_100soc_time) {
+		if (fg->param.smooth_full_soc > 0) {
+			//force 100soc at sys termi current
+			//if ((fg->param.smooth_full_soc == 100)
+			//		&& (chip->fastcharge_mode_enabled == 1)
+			//		&& (fg->param.batt_ma > FFC_SYS_TERMI_CURRENT))
+			//	fg->param.smooth_full_soc == 99;
+
+			fg->param.smooth_batt_soc = fg->param.smooth_full_soc;
+		}
+
+		if ((fg->charge_status == POWER_SUPPLY_STATUS_CHARGING || fg->param.batt_ma < 0)
+				&& (last_batt_soc < 3)
+				&& off_charge_flag
+				&& (fg->param.smooth_low_batt_soc < fg->param.smooth_batt_soc)) {
+			pr_info("smooth_low_batt_soc%d", fg->param.smooth_low_batt_soc);
+			pr_info("smooth_batt_soc%d", fg->param.smooth_batt_soc);
+			fg->param.smooth_low_batt_soc += DETAL_SOC;
+			fg->param.smooth_batt_soc = fg->param.smooth_low_batt_soc;
+		}
+
+		pr_info("last_smooth_batt_soc:%d, smooth_batt_soc:%d\n", last_smooth_batt_soc, fg->param.smooth_batt_soc);
+
+		if (last_smooth_batt_soc > 0) {
+			/*compare with last soc. avoid soc jump*/
+			if ((fg->param.smooth_batt_soc - last_smooth_batt_soc) > 1) {
+				fg->param.smooth_batt_soc = last_smooth_batt_soc + DETAL_SOC;
+				pr_info("batt_soc:++\n");
+			} else if ((last_smooth_batt_soc - fg->param.smooth_batt_soc) > 1) {
+				fg->param.smooth_batt_soc = last_smooth_batt_soc - DETAL_SOC;
+				pr_info("batt_soc:--\n");
+			}
+			pr_info("last_smooth_batt_soc:%d, smooth_batt_soc:%d\n", last_smooth_batt_soc, fg->param.smooth_batt_soc);
+
+			/*keep soc change with charging status*/
+			if ((fg->param.batt_ma < 0) && (fg->param.smooth_batt_soc < last_smooth_batt_soc)) {
+				pr_info("soc should not fall\n");
+				fg->param.smooth_batt_soc = last_smooth_batt_soc;
+			} else if ((fg->param.batt_ma > 0) && (fg->param.smooth_batt_soc > last_smooth_batt_soc)) {
+				pr_info("soc should not rise\n");
+				fg->param.smooth_batt_soc = last_smooth_batt_soc;
+			}
+		}
+
+		//fix batt soc jump after reboot in low batt soc
+		if ((last_smooth_batt_soc == 0)
+				&& !off_charge_flag
+				&& (last_batt_soc >= 2)
+				&& (last_batt_soc <= 5)) {
+			fg->param.smooth_batt_soc = last_batt_soc;
+			pr_info("fix soc jump after reboot, smooth_batt_soc:%d\n", fg->param.smooth_batt_soc);
+		}
+	}
+	/* if battery temperature is above critical high threshold, report it */
+	if (fg->param.batt_temp > CRITICAL_HIGH_TEMP) {
+		if (batt_psy_initialized(fg))
+			power_supply_changed(fg->batt_psy);
+	}
+
+	pr_info("soc:%d, last_soc:%d, raw_soc:%d, soc_changed:%d, batt_ma:%d, smooth_low_batt_soc:%d, smooth_soc: %d\n",
+				fg->param.batt_soc, last_batt_soc,
+				fg->param.batt_raw_soc, soc_changed, fg->param.batt_ma, fg->param.smooth_low_batt_soc, fg->param.smooth_batt_soc);
+}
+
+#define RESTART_FG_MONITOR_SOC_WAIT_PER_MS	30000
+static void empty_restart_fg_work(struct work_struct *work)
+{
+	struct fg_dev *fg = container_of(work, struct fg_dev,
+				    empty_restart_fg_work.work);
+	union power_supply_propval prop = {0, };
+	int usb_present = 0;
+	int rc;
+
+	if (usb_psy_initialized(fg)) {
+		rc = power_supply_get_property(fg->usb_psy,
+			POWER_SUPPLY_PROP_PRESENT, &prop);
+		if (rc < 0) {
+			pr_err("Couldn't read usb present prop rc=%d\n", rc);
+			return;
+		}
+		usb_present = prop.intval;
+	}
+
+	/* only when usb is absent, restart fg */
+	if (!usb_present) {
+		if (fg->profile_load_status == PROFILE_LOADED) {
+			pr_info("soc empty after cold to warm, need to restart fg\n");
+			fg->empty_restart_fg = true;
+			rc = fg_restart(fg, SOC_READY_WAIT_TIME_MS);
+			if (rc < 0) {
+				pr_err("Error in restarting FG, rc=%d\n", rc);
+				fg->empty_restart_fg = false;
+				return;
+			}
+			pr_info("FG restart done\n");
+			if (batt_psy_initialized(fg))
+				power_supply_changed(fg->batt_psy);
+			cancel_delayed_work_sync(&fg->soc_monitor_work);
+			schedule_delayed_work(&fg->soc_monitor_work,
+				msecs_to_jiffies(RESTART_FG_MONITOR_SOC_WAIT_PER_MS));
+		} else {
+			schedule_delayed_work(
+					&fg->empty_restart_fg_work,
+					msecs_to_jiffies(RESTART_FG_WORK_MS));
+		}
+	}
+}
+static int fg_dynamic_set_cutoff_voltage(struct fg_dev *fg,
+			int cut_off_mv)
+{
+	int rc;
+	u8 buf[4];
+
+	pr_err("set dynamic cutoff voltage to: %d\n", cut_off_mv);
+
+	fg_encode(fg->sp, FG_SRAM_CUTOFF_VOLT, cut_off_mv, buf);
+	rc = fg_sram_write(fg, fg->sp[FG_SRAM_CUTOFF_VOLT].addr_word,
+			fg->sp[FG_SRAM_CUTOFF_VOLT].addr_byte, buf,
+			fg->sp[FG_SRAM_CUTOFF_VOLT].len, FG_IMA_DEFAULT);
+	if (rc < 0) {
+		pr_err("Error in writing cutoff_volt, rc=%d\n", rc);
+		return rc;
+	}
+
+	return rc;
+}
+
+#define LOW_DISCHARGE_TEMP_TRH	150
+#define MONITOR_SOC_WAIT_READY	500
+#define MONITOR_SOC_WAIT_MS	1000
+#define MONITOR_SOC_WAIT_PER_MS	10000
+static void soc_monitor_work(struct work_struct *work)
+{
+	int rc;
+	struct fg_dev *fg = container_of(work,
+				struct fg_dev,
+				soc_monitor_work.work);
+	struct fg_gen4_chip *chip = container_of(fg, struct fg_gen4_chip, fg);
+
+	// Update battery information
+	rc = fg_get_battery_current(fg, &fg->param.batt_ma);
+	if (rc < 0)
+		pr_err("failded to get battery current, rc=%d\n", rc);
+
+	rc = fg_gen4_get_prop_capacity(fg, &fg->param.batt_raw_soc);
+	if (rc < 0)
+		pr_err("failed to get battery capacity, rc=%d\n", rc);
+
+	rc = fg_gen4_get_battery_temp(fg, &fg->param.batt_temp);
+	if (rc < 0)
+		pr_err("failed to get battery temperature, rc=%d\n", rc);
+
+	if (chip->dt.cutoff_voltage_adjust_enable) {
+		if (fg->param.batt_temp < LOW_DISCHARGE_TEMP_TRH ) {
+			chip->dt.cutoff_volt_mv = LOW_TEMP_CUTOFF_VOL_MV;
+			is_low_temp_flag = true;
+		} else {
+			chip->dt.cutoff_volt_mv	= NORMAL_TEMP_CUTOFF_VOL_MV;
+			is_low_temp_flag = false;
+		}
+		fg_dynamic_set_cutoff_voltage(fg, chip->dt.cutoff_volt_mv);
+		if (rc < 0)
+			pr_err("fg_dynamic_set_cutoff_voltage set failed\n");
+	}
+
+	if (fg->soc_reporting_ready)
+		fg_battery_soc_smooth_tracking(chip);
+
+	pr_info("soc:%d, raw_soc:%d, c:%d, s:%d\n",
+			fg->param.batt_soc, fg->param.batt_raw_soc,
+			fg->param.batt_ma, fg->charge_status);
+
+	if (chip->dt.fg_increase_100soc_time) {
+		if (!fg->soc_reporting_ready)
+			schedule_delayed_work(&fg->soc_monitor_work,
+				msecs_to_jiffies(MONITOR_SOC_WAIT_READY));
+		else
+			schedule_delayed_work(&fg->soc_monitor_work,
+				msecs_to_jiffies(MONITOR_SOC_WAIT_PER_MS));
+	} else {
+		schedule_delayed_work(&fg->soc_monitor_work,
+			msecs_to_jiffies(MONITOR_SOC_WAIT_PER_MS));
+	}
+}
+
 static void fg_gen4_cleanup(struct fg_gen4_chip *chip)
 {
 	struct fg_dev *fg = &chip->fg;
@@ -6437,6 +6798,9 @@ static int fg_gen4_probe(struct platform_device *pdev)
 			rc);
 		goto exit;
 	}
+
+	chip->hw_country = get_hw_country_version();
+	dev_err(fg->dev, "hw_country: %d\n", chip->hw_country);
 
 	rc = fg_gen4_parse_dt(chip);
 	if (rc < 0) {
