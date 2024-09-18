@@ -127,63 +127,26 @@ static inline void *fdt_offset_ptr_w(void *fdt, int offset, int checklen)
 uint32_t fdt_next_tag(const void *fdt, int offset, int *nextoffset);
 
 /*
- * External helpers to access words from a device tree blob. They're built
- * to work even with unaligned pointers on platforms (such as ARMv5) that don't
- * like unaligned loads and stores.
+ * Alignment helpers:
+ *     These helpers access words from a device tree blob.  They're
+ *     built to work even with unaligned pointers on platforms (ike
+ *     ARM) that don't like unaligned loads and stores
  */
-static inline uint16_t fdt16_ld(const fdt16_t *p)
-{
-	const uint8_t *bp = (const uint8_t *)p;
-
-	return ((uint16_t)bp[0] << 8) | bp[1];
-}
 
 static inline uint32_t fdt32_ld(const fdt32_t *p)
 {
-	const uint8_t *bp = (const uint8_t *)p;
+	fdt32_t v;
 
-	return ((uint32_t)bp[0] << 24)
-		| ((uint32_t)bp[1] << 16)
-		| ((uint32_t)bp[2] << 8)
-		| bp[3];
-}
-
-static inline void fdt32_st(void *property, uint32_t value)
-{
-	uint8_t *bp = (uint8_t *)property;
-
-	bp[0] = value >> 24;
-	bp[1] = (value >> 16) & 0xff;
-	bp[2] = (value >> 8) & 0xff;
-	bp[3] = value & 0xff;
+	memcpy(&v, p, sizeof(v));
+	return fdt32_to_cpu(v);
 }
 
 static inline uint64_t fdt64_ld(const fdt64_t *p)
 {
-	const uint8_t *bp = (const uint8_t *)p;
+	fdt64_t v;
 
-	return ((uint64_t)bp[0] << 56)
-		| ((uint64_t)bp[1] << 48)
-		| ((uint64_t)bp[2] << 40)
-		| ((uint64_t)bp[3] << 32)
-		| ((uint64_t)bp[4] << 24)
-		| ((uint64_t)bp[5] << 16)
-		| ((uint64_t)bp[6] << 8)
-		| bp[7];
-}
-
-static inline void fdt64_st(void *property, uint64_t value)
-{
-	uint8_t *bp = (uint8_t *)property;
-
-	bp[0] = value >> 56;
-	bp[1] = (value >> 48) & 0xff;
-	bp[2] = (value >> 40) & 0xff;
-	bp[3] = (value >> 32) & 0xff;
-	bp[4] = (value >> 24) & 0xff;
-	bp[5] = (value >> 16) & 0xff;
-	bp[6] = (value >> 8) & 0xff;
-	bp[7] = value & 0xff;
+	memcpy(&v, p, sizeof(v));
+	return fdt64_to_cpu(v);
 }
 
 /**********************************************************************/
@@ -278,21 +241,16 @@ fdt_set_hdr_(size_dt_struct);
 /**
  * fdt_header_size - return the size of the tree's header
  * @fdt: pointer to a flattened device tree
- *
- * Return: size of DTB header in bytes
- */
-size_t fdt_header_size(const void *fdt);
-
-/**
- * fdt_header_size_ - internal function to get header size from a version number
- * @version: devicetree version number
- *
- * Return: size of DTB header in bytes
  */
 size_t fdt_header_size_(uint32_t version);
+static inline size_t fdt_header_size(const void *fdt)
+{
+	return fdt_header_size_(fdt_version(fdt));
+}
 
 /**
  * fdt_check_header - sanity check a device tree header
+
  * @fdt: pointer to data which might be a flattened device tree
  *
  * fdt_check_header() checks that the given buffer contains what
@@ -1219,7 +1177,9 @@ int fdt_address_cells(const void *fdt, int nodeoffset);
  *
  * returns:
  *	0 <= n < FDT_MAX_NCELLS, on success
- *      1, if the node has no #size-cells property
+
+ *      2, if the node has no #size-cells property
+
  *      -FDT_ERR_BADNCELLS, if the node has a badly formatted or invalid
  *		#size-cells property
  *	-FDT_ERR_BADMAGIC,

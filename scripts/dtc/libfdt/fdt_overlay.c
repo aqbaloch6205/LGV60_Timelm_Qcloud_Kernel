@@ -820,10 +820,6 @@ int fdt_overlay_apply(void *fdt, void *fdto)
 	FDT_RO_PROBE(fdt);
 	FDT_RO_PROBE(fdto);
 
-	ret = fdt_find_max_phandle(fdt, &delta);
-	if (ret)
-		goto err;
-
 	ret = overlay_adjust_local_phandles(fdto, delta);
 	if (ret)
 		goto err;

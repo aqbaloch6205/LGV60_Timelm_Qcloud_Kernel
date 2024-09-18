@@ -3,6 +3,22 @@
  * (C) Copyright Linaro, Ltd. 2018
  * (C) Copyright Arm Holdings.  2017
  * (C) Copyright David Gibson <dwg@au1.ibm.com>, IBM Corporation.  2005.
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License as
+ * published by the Free Software Foundation; either version 2 of the
+ * License, or (at your option) any later version.
+ *
+ *  This program is distributed in the hope that it will be useful,
+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ *  General Public License for more details.
+ *
+ *  You should have received a copy of the GNU General Public License
+ *  along with this program; if not, write to the Free Software
+ *  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307
+ *                                                                   USA
+
  */
 
 #include <stdlib.h>
@@ -29,13 +45,11 @@ char *yaml_error_name[] = {
 		    (emitter)->problem, __func__, __LINE__);		\
 })
 
-static void yaml_propval_int(yaml_emitter_t *emitter, struct marker *markers,
-	char *data, unsigned int seq_offset, unsigned int len, int width)
+static void yaml_propval_int(yaml_emitter_t *emitter, struct marker *markers, char *data, int len, int width)
 {
 	yaml_event_t event;
 	void *tag;
-	unsigned int off;
-
+	int off, start_offset = markers->offset;
 	switch(width) {
 		case 1: tag = "!u8"; break;
 		case 2: tag = "!u16"; break;
@@ -60,21 +74,21 @@ static void yaml_propval_int(yaml_emitter_t *emitter, struct marker *markers,
 			sprintf(buf, "0x%"PRIx8, *(uint8_t*)(data + off));
 			break;
 		case 2:
-			sprintf(buf, "0x%"PRIx16, dtb_ld16(data + off));
+			sprintf(buf, "0x%"PRIx16, fdt16_to_cpu(*(fdt16_t*)(data + off)));
 			break;
 		case 4:
-			sprintf(buf, "0x%"PRIx32, dtb_ld32(data + off));
+			sprintf(buf, "0x%"PRIx32, fdt32_to_cpu(*(fdt32_t*)(data + off)));
 			m = markers;
 			is_phandle = false;
 			for_each_marker_of_type(m, REF_PHANDLE) {
-				if (m->offset == (seq_offset + off)) {
+				if (m->offset == (start_offset + off)) {
 					is_phandle = true;
 					break;
 				}
 			}
 			break;
 		case 8:
-			sprintf(buf, "0x%"PRIx64, dtb_ld64(data + off));
+			sprintf(buf, "0x%"PRIx64, fdt64_to_cpu(*(fdt64_t*)(data + off)));
 			break;
 		}
 
@@ -113,9 +127,8 @@ static void yaml_propval_string(yaml_emitter_t *emitter, char *str, int len)
 static void yaml_propval(yaml_emitter_t *emitter, struct property *prop)
 {
 	yaml_event_t event;
-	unsigned int len = prop->val.len;
+	int len = prop->val.len;
 	struct marker *m = prop->val.markers;
-	struct marker *markers = prop->val.markers;
 
 	/* Emit the property name */
 	yaml_scalar_event_initialize(&event, NULL,
@@ -153,19 +166,19 @@ static void yaml_propval(yaml_emitter_t *emitter, struct property *prop)
 
 		switch(m->type) {
 		case TYPE_UINT16:
-			yaml_propval_int(emitter, markers, data, m->offset, chunk_len, 2);
+			yaml_propval_int(emitter, m, data, chunk_len, 2);
 			break;
 		case TYPE_UINT32:
-			yaml_propval_int(emitter, markers, data, m->offset, chunk_len, 4);
+			yaml_propval_int(emitter, m, data, chunk_len, 4);
 			break;
 		case TYPE_UINT64:
-			yaml_propval_int(emitter, markers, data, m->offset, chunk_len, 8);
+			yaml_propval_int(emitter, m, data, chunk_len, 8);
 			break;
 		case TYPE_STRING:
 			yaml_propval_string(emitter, data, chunk_len);
 			break;
 		default:
-			yaml_propval_int(emitter, markers, data, m->offset, chunk_len, 1);
+			yaml_propval_int(emitter, m, data, chunk_len, 1);
 			break;
 		}
 	}
