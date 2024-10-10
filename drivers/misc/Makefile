@@ -78,3 +78,12 @@ obj-$(CONFIG_QTI_XR_SMRTVWR_MISC) += qxr-stdalonevwr.o
 obj-$(CONFIG_FPR_FPC)		+= fpr_FingerprintCard/
 obj-y                           += qrc/
 obj-$(CONFIG_KINECTICS_XR_NORDIC) += kxrctrl/
+<<<<<<< HEAD
+=======
+
+obj-$(CONFIG_HALL_AKM09970)	+= akm09970.o
+obj-$(CONFIG_MOTOR_DRV8846)	+= drv8846.o
+obj-$(CONFIG_SPI_XIAOMI_TP)	+= spi-xiaomi-tp.o
+obj-$(CONFIG_MMHARDWARE_OTHER_DETECTION) += mmhardware_others.o
+obj-$(CONFIG_PERF_HELPER)	+= perf_helper.o
+>>>>>>> 1b1a44df5fec (Import perf_helper for MIUI build)
