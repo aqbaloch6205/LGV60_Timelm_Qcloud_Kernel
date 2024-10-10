@@ -86,4 +86,7 @@ obj-$(CONFIG_MOTOR_DRV8846)	+= drv8846.o
 obj-$(CONFIG_SPI_XIAOMI_TP)	+= spi-xiaomi-tp.o
 obj-$(CONFIG_MMHARDWARE_OTHER_DETECTION) += mmhardware_others.o
 obj-$(CONFIG_PERF_HELPER)	+= perf_helper.o
+<<<<<<< HEAD
+>>>>>>> 1b1a44df5fec (Import perf_helper for MIUI build)
+=======
 >>>>>>> 1b1a44df5fec (Import perf_helper for MIUI build)

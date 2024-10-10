@@ -663,6 +663,9 @@ config PERF_HELPER
 	  this module support record perf lock history and other perf messages.
 
 
+<<<<<<< HEAD
+>>>>>>> 1b1a44df5fec (Import perf_helper for MIUI build)
+=======
 >>>>>>> 1b1a44df5fec (Import perf_helper for MIUI build)
 source "drivers/misc/c2port/Kconfig"
 source "drivers/misc/eeprom/Kconfig"
