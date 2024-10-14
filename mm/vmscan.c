@@ -63,6 +63,10 @@
 
 #include "internal.h"
 
+#ifdef CONFIG_MI_RECLAIM
+#include <linux/mi_reclaim.h>
+#endif
+
 #define CREATE_TRACE_POINTS
 #include <trace/events/vmscan.h>
 
