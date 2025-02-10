@@ -1,7 +1,9 @@
 # SPDX-License-Identifier: GPL-2.0
 config ZRAM
 	tristate "Compressed RAM block device support"
-	depends on BLOCK && SYSFS && ZSMALLOC && CRYPTO && MMU
+	depends on BLOCK && SYSFS && MMU
+	depends on CRYPTO_LZO || CRYPTO_LZO_RLE || CRYPTO_ZSTD || CRYPTO_LZ4 || CRYPTO_LZ4KD || CRYPTO_LZ4HC || CRYPTO_842 || CRYPTO_DEFLATE
+	select ZSMALLOC
 	select CRYPTO_LZO
 	select CRYPTO_LZO_RLE
 	select CRYPTO_LZ4
