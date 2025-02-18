@@ -3,6 +3,12 @@
 #include <linux/init.h>
 #include <linux/proc_fs.h>
 #include <linux/seq_file.h>
+
+#ifdef CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG
+extern int susfs_spoof_cmdline_or_bootconfig(struct seq_file *m);
+#endif
+
+#ifdef CONFIG_INITRAMFS_IGNORE_SKIP_FLAG
 #include <asm/setup.h>
 #include <soc/qcom/lge/board_lge.h>
 #include <linux/slab.h>
@@ -39,6 +45,11 @@ static int cmdline_proc_show(struct seq_file *m, void *v)
 		seq_putc(m, '\n');
 		return 0;
 	}
+#endif
+#ifdef CONFIG_INITRAMFS_IGNORE_SKIP_FLAG
+	seq_puts(m, proc_command_line);
+#else
+	seq_puts(m, saved_command_line);
 #endif
 #ifdef CONFIG_MACH_LGE
 	if (lge_get_boot_mode() == LGE_BOOT_MODE_CHARGERLOGO) {
