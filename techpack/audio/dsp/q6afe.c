@@ -31,7 +31,7 @@
 
 #if defined(CONFIG_SND_LGE_VOICE_BOKEH)
 #include <linux/extcon.h>
-#include "../../../../../kernel/msm-4.19/drivers/extcon/extcon.h"
+#include "../../../../drivers/extcon/extcon.h"
 
 //#define VOC_MUTE "voice_bokeh_status"
 #define AFE_OPCODE_LGE_VOICE_BOKEH_DET 0x10001129
