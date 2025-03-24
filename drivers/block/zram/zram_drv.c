@@ -61,7 +61,9 @@ static size_t huge_class_size;
 static  int default_time_list[] = {60, 120, 180, 300, 600};
 #endif
 #ifdef CONFIG_ZRAM_WRITEBACK
+#ifdef CONFIG_MIUI_ZRAM_MEMORY_TRACKING
 static unsigned int memory_freeze = 1;
+#endif
 static unsigned int glow_compress_ratio = 75;
 #endif
 static void zram_free_page(struct zram *zram, size_t index);
@@ -397,6 +399,7 @@ static ssize_t new_store(struct device *dev,
 }
 
 #ifdef CONFIG_ZRAM_WRITEBACK
+#ifdef CONFIG_MIUI_ZRAM_MEMORY_TRACKING
 static ssize_t memory_freeze_store(struct device *dev,
 		struct device_attribute *attr, const char *buf, size_t len)
 {
@@ -448,6 +451,7 @@ static ssize_t low_compress_ratio_show(struct device *dev,
 {
 	return scnprintf(buf, PAGE_SIZE, "%u\n", glow_compress_ratio);
 }
+#endif
 
 static ssize_t writeback_limit_enable_store(struct device *dev,
 		struct device_attribute *attr, const char *buf, size_t len)
