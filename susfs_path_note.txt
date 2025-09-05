@@ -1,0 +1,11 @@
+cp ./kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch /home/bhazheng/android_kernel_lge_sm8250/KernelSU-Next/
+
+cp ./kernel_patches/50_add_susfs_in_kernel-4.19.patch /home/bhazheng/android_kernel_lge_sm8250/
+
+cp ./kernel_patches/fs/* /home/bhazheng/android_kernel_lge_sm8250/fs/
+
+cp ./kernel_patches/include/linux/* /home/bhazheng/android_kernel_lge_sm8250/include/linux/
+
+cd /home/bhazheng/android_kernel_lge_sm8250/KernelSU-Next  and then patch -p1 < 10_enable_susfs_for_ksu.patch
+
+cd /home/bhazheng/android_kernel_lge_sm8250  and then patch -p1 < 50_add_susfs_in_kernel-4.19.patch
