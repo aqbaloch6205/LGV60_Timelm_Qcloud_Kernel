@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-2.0
 /*
- *  linux/fs/read_write.c
+ * linux/fs/read_write.c
  *
- *  Copyright (C) 1991, 1992  Linus Torvalds
+ * Copyright (C) 1991, 1992  Linus Torvalds
  */
 
 #include <linux/slab.h>
@@ -736,7 +736,7 @@ static ssize_t do_loop_readv_writev(struct file *filp, struct iov_iter *iter,
 
 /**
  * rw_copy_check_uvector() - Copy an array of &struct iovec from userspace
- *     into the kernel and check that it is valid.
+ * into the kernel and check that it is valid.
  *
  * @type: One of %CHECK_IOVEC_ONLY, %READ, or %WRITE.
  * @uvector: Pointer to the userspace array.
@@ -744,8 +744,8 @@ static ssize_t do_loop_readv_writev(struct file *filp, struct iov_iter *iter,
  * @fast_segs: Number of elements in @fast_pointer.
  * @fast_pointer: Pointer to (usually small on-stack) kernel array.
  * @ret_pointer: (output parameter) Pointer to a variable that will point to
- *     either @fast_pointer, a newly allocated kernel array, or NULL,
- *     depending on which array was used.
+ * either @fast_pointer, a newly allocated kernel array, or NULL,
+ * depending on which array was used.
  *
  * This function copies an array of &struct iovec of @nr_segs from
  * userspace into the kernel and checks that each element is valid (e.g.
@@ -761,7 +761,7 @@ static ssize_t do_loop_readv_writev(struct file *filp, struct iov_iter *iter,
  * @fast_pointer array was used and it was allocated on the stack.
  *
  * Return: The total number of bytes covered by the iovec array on success
- *   or a negative error code on error.
+ * or a negative error code on error.
  */
 ssize_t rw_copy_check_uvector(int type, const struct iovec __user * uvector,
 			      unsigned long nr_segs, unsigned long fast_segs,

@@ -386,11 +386,14 @@ extern int ksu_handle_input_handle_event(unsigned int *type, unsigned int *code,
 static void input_handle_event(struct input_dev *dev,
 			       unsigned int type, unsigned int code, int value)
 {
-	int disposition = input_get_disposition(dev, type, code, &value);
+	int disposition;
+
 #ifdef CONFIG_KSU
 	if (unlikely(ksu_input_hook))
 		ksu_handle_input_handle_event(&type, &code, &value);
 #endif
+
+	disposition = input_get_disposition(dev, type, code, &value);
 
 	if (disposition != INPUT_IGNORE_EVENT && type != EV_SYN)
 		add_input_randomness(type, code, value);
@@ -2011,7 +2014,7 @@ EXPORT_SYMBOL(input_free_device);
  * input_set_timestamp - set timestamp for input events
  * @dev: input device to set timestamp for
  * @timestamp: the time at which the event has occurred
- *   in CLOCK_MONOTONIC
+ * in CLOCK_MONOTONIC
  *
  * This function is intended to provide to the input system a more
  * accurate time of when an event actually occurred. The driver should
