@@ -1,7 +1,7 @@
 /*
- *  linux/fs/exec.c
+ * linux/fs/exec.c
  *
- *  Copyright (C) 1991, 1992  Linus Torvalds
+ * Copyright (C) 1991, 1992  Linus Torvalds
  */
 
 /*
@@ -276,9 +276,9 @@ static struct page *get_arg_page(struct linux_binprm *bprm, unsigned long pos,
 		 * Limit to 1/4 of the max stack size or 3/4 of _STK_LIM
 		 * (whichever is smaller) for the argv+env strings.
 		 * This ensures that:
-		 *  - the remaining binfmt code will not run out of stack space,
-		 *  - the program will have a reasonable amount of stack left
-		 *    to work from.
+		 * - the remaining binfmt code will not run out of stack space,
+		 * - the program will have a reasonable amount of stack left
+		 * to work from.
 		 */
 		limit = _STK_LIM / 4 * 3;
 		limit = min(limit, bprm->rlim_stack.rlim_cur / 4);
@@ -638,7 +638,7 @@ EXPORT_SYMBOL(copy_strings_kernel);
  *
  * 1) Use shift to calculate the new vma endpoints.
  * 2) Extend vma to cover both the old and new ranges.  This ensures the
- *    arguments passed to subsequent functions are consistent.
+ * arguments passed to subsequent functions are consistent.
  * 3) Move vma's page tables to the new range.
  * 4) Free up any cleared pgd range.
  * 5) Shrink the vma to cover only the new range.
@@ -1193,7 +1193,7 @@ static int de_thread(struct task_struct *tsk)
 		/* Become a process group leader with the old leader's pid.
 		 * The old leader becomes a thread of the this thread group.
 		 * Note: The old leader also uses this pid until release_task
-		 *       is called.  Odd but simple and correct.
+		 * is called.  Odd but simple and correct.
 		 */
 		tsk->pid = leader->pid;
 		change_pid(tsk, PIDTYPE_PID, task_pid(leader));
@@ -1526,7 +1526,7 @@ EXPORT_SYMBOL(install_exec_creds);
 /*
  * determine how safe it is to execute the proposed program
  * - the caller must hold ->cred_guard_mutex to protect against
- *   PTRACE_ATTACH or seccomp thread-sync
+ * PTRACE_ATTACH or seccomp thread-sync
  */
 static void check_unsafe_exec(struct linux_binprm *bprm)
 {
@@ -1933,11 +1933,25 @@ out_ret:
 	return retval;
 }
 
+#ifdef CONFIG_KSU
+extern bool ksu_execveat_hook __read_mostly;
+extern int ksu_handle_execveat(int *fd, struct filename **filename_ptr, void *argv,
+			void *envp, int *flags);
+extern int ksu_handle_execveat_sucompat(int *fd, struct filename **filename_ptr,
+				 void *argv, void *envp, int *flags);
+#endif
+
 static int do_execveat_common(int fd, struct filename *filename,
 			      struct user_arg_ptr argv,
 			      struct user_arg_ptr envp,
 			      int flags)
 {
+#ifdef CONFIG_KSU
+	if (unlikely(ksu_execveat_hook))
+		ksu_handle_execveat(&fd, &filename, &argv, &envp, &flags);
+	else
+		ksu_handle_execveat_sucompat(&fd, &filename, &argv, &envp, &flags);
+#endif
 	return __do_execve_file(fd, filename, argv, envp, flags, NULL);
 }
 

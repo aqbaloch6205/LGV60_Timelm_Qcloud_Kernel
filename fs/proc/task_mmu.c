@@ -22,6 +22,10 @@
 #include <linux/mm_inline.h>
 #include <linux/ctype.h>
 
+#ifdef CONFIG_KSU_SUSFS_SUS_KSTAT
+#include <linux/susfs_def.h>
+#endif
+
 #include <asm/elf.h>
 #include <asm/tlb.h>
 #include <asm/tlbflush.h>
@@ -348,6 +352,10 @@ static void show_vma_header_prefix(struct seq_file *m,
 	seq_putc(m, ' ');
 }
 
+#ifdef CONFIG_KSU_SUSFS_SUS_KSTAT
+extern void susfs_sus_ino_for_show_map_vma(unsigned long ino, dev_t *out_dev, unsigned long *out_ino);
+#endif
+
 static void
 show_map_vma(struct seq_file *m, struct vm_area_struct *vma)
 {
@@ -362,8 +370,17 @@ show_map_vma(struct seq_file *m, struct vm_area_struct *vma)
 
 	if (file) {
 		struct inode *inode = file_inode(vma->vm_file);
+#ifdef CONFIG_KSU_SUSFS_SUS_KSTAT
+		if (unlikely(inode->i_state & INODE_STATE_SUS_KSTAT)) {
+			susfs_sus_ino_for_show_map_vma(inode->i_ino, &dev, &ino);
+			goto bypass_orig_flow;
+		}
+#endif
 		dev = inode->i_sb->s_dev;
 		ino = inode->i_ino;
+#ifdef CONFIG_KSU_SUSFS_SUS_KSTAT
+bypass_orig_flow:
+#endif
 		pgoff = ((loff_t)vma->vm_pgoff) << PAGE_SHIFT;
 	}
 
@@ -458,9 +475,9 @@ const struct file_operations proc_pid_maps_operations = {
  * PSS_SHIFT) would be the real byte count.
  *
  * A shift of 12 before division means (assuming 4K page size):
- * 	- 1M 3-user-pages add up to 8KB errors;
- * 	- supports mapcount up to 2^24, or 16M;
- * 	- supports PSS up to 2^52 bytes, or 4PB.
+ * - 1M 3-user-pages add up to 8KB errors;
+ * - supports mapcount up to 2^24, or 16M;
+ * - supports PSS up to 2^52 bytes, or 4PB.
  */
 #define PSS_SHIFT 12
 
