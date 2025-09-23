@@ -44,6 +44,13 @@
 #define avc_cache_stats_incr(field)	do {} while (0)
 #endif
 
+#ifdef CONFIG_KSU_SUSFS
+extern u32 susfs_ksu_sid;
+extern u32 susfs_kernel_sid;
+bool susfs_is_avc_log_spoofing_enabled = false;
+#endif
+
+
 struct avc_entry {
 	u32			ssid;
 	u32			tsid;
@@ -750,6 +757,7 @@ static void avc_audit_pre_callback(struct audit_buffer *ab, void *a)
 static void avc_audit_post_callback(struct audit_buffer *ab, void *a)
 {
 	struct common_audit_data *ad = a;
+	struct selinux_audit_data *sad = ad->selinux_audit_data;
 	audit_log_format(ab, " ");
 	avc_dump_query(ab, ad->selinux_audit_data->state,
 		       ad->selinux_audit_data->ssid,

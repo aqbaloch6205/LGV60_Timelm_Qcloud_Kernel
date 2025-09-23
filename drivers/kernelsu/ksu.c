@@ -22,6 +22,7 @@ bool ksu_queue_work(struct work_struct *work)
 	return queue_work(ksu_workqueue, work);
 }
 
+#ifdef CONFIG_KSU_KPROBES_HOOK
 extern int ksu_handle_execveat_sucompat(int *fd, struct filename **filename_ptr,
 					void *argv, void *envp, int *flags);
 
@@ -35,13 +36,14 @@ int ksu_handle_execveat(int *fd, struct filename **filename_ptr, void *argv,
 	return ksu_handle_execveat_sucompat(fd, filename_ptr, argv, envp,
 					    flags);
 }
+#endif
 
 extern void ksu_sucompat_init();
 extern void ksu_sucompat_exit();
 extern void ksu_ksud_init();
 extern void ksu_ksud_exit();
 
-int __init ksu_kernelsu_init(void)
+int __init kernelsu_init(void)
 {
 #ifdef CONFIG_KSU_DEBUG
 	pr_alert("*************************************************************");
@@ -80,7 +82,7 @@ int __init ksu_kernelsu_init(void)
 	return 0;
 }
 
-void ksu_kernelsu_exit(void)
+void kernelsu_exit(void)
 {
 	ksu_allowlist_exit();
 
@@ -96,8 +98,8 @@ void ksu_kernelsu_exit(void)
 	ksu_core_exit();
 }
 
-module_init(ksu_kernelsu_init);
-module_exit(ksu_kernelsu_exit);
+module_init(kernelsu_init);
+module_exit(kernelsu_exit);
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("weishu");

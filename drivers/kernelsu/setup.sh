@@ -14,6 +14,8 @@ display_usage() {
 initialize_variables() {
     if test -d "$GKI_ROOT/common/drivers"; then
          DRIVER_DIR="$GKI_ROOT/common/drivers"
+    elif test -d "$GKI_ROOT/aosp/drivers"; then
+         DRIVER_DIR="$GKI_ROOT/aosp/drivers"
     elif test -d "$GKI_ROOT/drivers"; then
          DRIVER_DIR="$GKI_ROOT/drivers"
     else
@@ -38,18 +40,24 @@ perform_cleanup() {
 
 # Sets up or update KernelSU-Next environment
 setup_kernelsu() {
+    BRANCH="next-susfs"
     echo "[+] Setting up KernelSU-Next..."
-    test -d "$GKI_ROOT/KernelSU-Next" || git clone https://github.com/KernelSU-Next/KernelSU-Next && echo "[+] Repository cloned."
+    test -d "$GKI_ROOT/KernelSU-Next" || git clone https://github.com/pershoot/KernelSU-Next && echo "[+] Repository cloned."
     cd "$GKI_ROOT/KernelSU-Next"
     git stash && echo "[-] Stashed current changes."
-    if [ "$(git status | grep -Po 'v\d+(\.\d+)*' | head -n1)" ]; then
-        git checkout next-susfs-a13-5.15-dev && echo "[-] Switched to next-susfs-a13-5.15-dev branch."
+    if [ "$(git status | sed -n 's/.*\(v[0-9][0-9.]*\).*/\1/p' | head -n1)" ]; then
+        git checkout "$BRANCH" && echo "[-] Switched to $BRANCH branch."
     fi
     git pull && echo "[+] Repository updated."
     if [ -z "${1-}" ]; then
         git checkout "$(git describe --abbrev=0 --tags)" && echo "[-] Checked out latest tag."
     else
         git checkout "$1" && echo "[-] Checked out $1." || echo "[-] Checkout default branch"
+        if [ -z "${2-}" ]; then
+            echo "[-] Using manual hooks"
+        elif [[ "$2" = "kprobes" && "$(git symbolic-ref --short HEAD | grep -w ^$BRANCH$)" = "$BRANCH" ]]; then
+               git revert "$(git log --pretty=oneline | grep -w 'kernel: Switch to manual hooks in config$' | cut -f1 -d' ')" --no-edit && echo "[+] Switched to and using $2 hooking." || echo "[-] Using manual hooks"
+        fi
     fi
     cd "$DRIVER_DIR"
     ln -sf "$(realpath --relative-to="$DRIVER_DIR" "$GKI_ROOT/KernelSU-Next/kernel")" "kernelsu" && echo "[+] Symlink created."
