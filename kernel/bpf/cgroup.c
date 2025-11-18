@@ -1757,7 +1757,7 @@ static u32 sysctl_convert_ctx_access(enum bpf_access_type type,
 		*insn++ = BPF_LDX_MEM(
 			BPF_SIZE(si->code), si->dst_reg, si->src_reg,
 			bpf_target_off(struct bpf_sysctl_kern, write,
-				       FIELD_SIZEOF(struct bpf_sysctl_kern,
+				       sizeof_field(struct bpf_sysctl_kern,
 						    write),
 				       target_size));
 		break;
@@ -1855,7 +1855,7 @@ static bool cg_sockopt_is_valid_access(int off, int size,
 			return prog->expected_attach_type ==
 				BPF_CGROUP_GETSOCKOPT;
 		case offsetof(struct bpf_sockopt, optname):
-			/* fallthrough */
+			fallthrough;
 		case offsetof(struct bpf_sockopt, level):
 			if (size != size_default)
 				return false;

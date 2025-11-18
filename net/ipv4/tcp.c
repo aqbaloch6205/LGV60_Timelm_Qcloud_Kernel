@@ -461,13 +461,10 @@ void tcp_init_sock(struct sock *sk)
 	WRITE_ONCE(sk->sk_sndbuf, sock_net(sk)->ipv4.sysctl_tcp_wmem[1]);
 	WRITE_ONCE(sk->sk_rcvbuf, sock_net(sk)->ipv4.sysctl_tcp_rmem[1]);
 
-
-
 	sk_sockets_allocated_inc(sk);
 	sk->sk_route_forced_caps = NETIF_F_GSO;
 }
 EXPORT_SYMBOL(tcp_init_sock);
-
 
 static void tcp_tx_timestamp(struct sock *sk, u16 tsflags)
 {
@@ -1797,11 +1794,11 @@ static int tcp_zerocopy_receive(struct sock *sk,
 
 	sock_rps_record_flow(sk);
 
-	down_read(&current->mm->mmap_sem);
+	mmap_read_lock(current->mm);
 
 	vma = find_vma(current->mm, address);
 	if (!vma || vma->vm_start > address || vma->vm_ops != &tcp_vm_ops) {
-		up_read(&current->mm->mmap_sem);
+		mmap_read_unlock(current->mm);
 		return -EINVAL;
 	}
 	zc->length = min_t(unsigned long, zc->length, vma->vm_end - address);
@@ -1848,7 +1845,7 @@ static int tcp_zerocopy_receive(struct sock *sk,
 		frags++;
 	}
 out:
-	up_read(&current->mm->mmap_sem);
+	mmap_read_unlock(current->mm);
 	if (length) {
 		WRITE_ONCE(tp->copied_seq, seq);
 		tcp_rcv_space_adjust(sk);
@@ -2588,6 +2585,7 @@ int tcp_disconnect(struct sock *sk, int flags)
 	struct inet_connection_sock *icsk = inet_csk(sk);
 	struct tcp_sock *tp = tcp_sk(sk);
 	int old_state = sk->sk_state;
+	struct request_sock *req;
 	u32 seq;
 
 	if (old_state != TCP_CLOSE)
@@ -2684,6 +2682,10 @@ int tcp_disconnect(struct sock *sk, int flags)
 
 
 	/* Clean up fastopen related fields */
+	req = rcu_dereference_protected(tp->fastopen_rsk,
+					lockdep_sock_is_held(sk));
+	if (req)
+		reqsk_fastopen_remove(sk, req, false);
 	tcp_free_fastopen_req(tp);
 	inet->defer_connect = 0;
 
@@ -3970,7 +3972,7 @@ void __init tcp_init(void)
 
 	BUILD_BUG_ON(TCP_MIN_SND_MSS <= MAX_TCP_OPTION_SPACE);
 	BUILD_BUG_ON(sizeof(struct tcp_skb_cb) >
-		     FIELD_SIZEOF(struct sk_buff, cb));
+		     sizeof_field(struct sk_buff, cb));
 
 	percpu_counter_init(&tcp_sockets_allocated, 0, GFP_KERNEL);
 	percpu_counter_init(&tcp_orphan_count, 0, GFP_KERNEL);

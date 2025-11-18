@@ -460,7 +460,7 @@ static inline bool insn_is_zext(const struct bpf_insn *insn)
 
 #define BPF_FIELD_SIZEOF(type, field)				\
 	({							\
-		const int __size = bytes_to_bpf_size(FIELD_SIZEOF(type, field)); \
+		const int __size = bytes_to_bpf_size(sizeof_field(type, field)); \
 		BUILD_BUG_ON(__size < 0);			\
 		__size;						\
 	})
@@ -540,7 +540,7 @@ static inline bool insn_is_zext(const struct bpf_insn *insn)
 
 #define bpf_target_off(TYPE, MEMBER, SIZE, PTR_SIZE)				\
 	({									\
-		BUILD_BUG_ON(FIELD_SIZEOF(TYPE, MEMBER) != (SIZE));		\
+		BUILD_BUG_ON(sizeof_field(TYPE, MEMBER) != (SIZE));		\
 		*(PTR_SIZE) = (SIZE);						\
 		offsetof(TYPE, MEMBER);						\
 	})
@@ -562,9 +562,6 @@ struct sock_fprog_kern {
 #define BPF_IMAGE_ALIGNMENT 8
 
 struct bpf_binary_header {
-#ifdef CONFIG_CFI_CLANG
-	u32 magic;
-#endif
 	u32 pages;
 	u8 image[] __aligned(BPF_IMAGE_ALIGNMENT);
 };
@@ -604,20 +601,48 @@ struct sk_filter {
 	struct bpf_prog	*prog;
 };
 
-#if IS_ENABLED(CONFIG_BPF_JIT) && IS_ENABLED(CONFIG_CFI_CLANG)
-/*
- * With JIT, the kernel makes an indirect call to dynamically generated
- * code. Use bpf_call_func to perform additional validation of the call
- * target to narrow down attack surface. Architectures implementing BPF
- * JIT can override arch_bpf_jit_check_func for arch-specific checking.
- */
-extern bool arch_bpf_jit_check_func(const struct bpf_prog *prog);
+DECLARE_STATIC_KEY_FALSE(bpf_stats_enabled_key);
 
-static inline unsigned int __bpf_call_func(const struct bpf_prog *prog,
-					   const void *ctx)
+#define __BPF_PROG_RUN(prog, ctx, dfunc)	({			\
+	u32 __ret;							\
+	cant_migrate();							\
+	if (static_branch_unlikely(&bpf_stats_enabled_key)) {		\
+		struct bpf_prog_stats *__stats;				\
+		u64 __start = sched_clock();				\
+		__ret = dfunc(ctx, (prog)->insnsi, (prog)->bpf_func);	\
+		__stats = this_cpu_ptr(prog->aux->stats);		\
+		u64_stats_update_begin(&__stats->syncp);		\
+		__stats->cnt++;						\
+		__stats->nsecs += sched_clock() - __start;		\
+		u64_stats_update_end(&__stats->syncp);			\
+	} else {							\
+		__ret = dfunc(ctx, (prog)->insnsi, (prog)->bpf_func);	\
+	}								\
+	__ret; })
+
+#define BPF_PROG_RUN(prog, ctx)						\
+	__BPF_PROG_RUN(prog, ctx, bpf_dispatcher_nop_func)
+
+/*
+ * Use in preemptible and therefore migratable context to make sure that
+ * the execution of the BPF program runs on one CPU.
+ *
+ * This uses migrate_disable/enable() explicitly to document that the
+ * invocation of a BPF program does not require reentrancy protection
+ * against a BPF program which is invoked from a preempting task.
+ *
+ * For non RT enabled kernels migrate_disable/enable() maps to
+ * preempt_disable/enable(), i.e. it disables also preemption.
+ */
+static inline u32 bpf_prog_run_pin_on_cpu(const struct bpf_prog *prog,
+					  const void *ctx)
 {
-	/* Call interpreter with CFI checking. */
-	return prog->bpf_func(ctx, prog->insnsi);
+	u32 ret;
+
+	migrate_disable();
+	ret = __BPF_PROG_RUN(prog, ctx, bpf_dispatcher_nop_func);
+	migrate_enable();
+	return ret;
 }
 
 static inline struct bpf_binary_header *
@@ -684,13 +709,6 @@ DECLARE_STATIC_KEY_FALSE(bpf_stats_enabled_key);
 /*
  * Use in preemptible and therefore migratable context to make sure that
  * the execution of the BPF program runs on one CPU.
- *
- * This uses migrate_disable/enable() explicitly to document that the
- * invocation of a BPF program does not require reentrancy protection
- * against a BPF program which is invoked from a preempting task.
- *
- * For non RT enabled kernels migrate_disable/enable() maps to
- * preempt_disable/enable(), i.e. it disables also preemption.
  */
 static inline u32 bpf_prog_run_pin_on_cpu(const struct bpf_prog *prog,
 					  const void *ctx)
@@ -743,7 +761,7 @@ static inline void bpf_compute_data_pointers(struct sk_buff *skb)
 {
 	struct bpf_skb_data_end *cb = (struct bpf_skb_data_end *)skb->cb;
 
-	BUILD_BUG_ON(sizeof(*cb) > FIELD_SIZEOF(struct sk_buff, cb));
+	BUILD_BUG_ON(sizeof(*cb) > sizeof_field(struct sk_buff, cb));
 	cb->data_meta = skb->data - skb_metadata_len(skb);
 	cb->data_end  = skb->data + skb_headlen(skb);
 }
@@ -781,9 +799,9 @@ static inline u8 *bpf_skb_cb(struct sk_buff *skb)
 	 * attached to sockets, we need to clear the bpf_skb_cb() area
 	 * to not leak previous contents to user space.
 	 */
-	BUILD_BUG_ON(FIELD_SIZEOF(struct __sk_buff, cb) != BPF_SKB_CB_LEN);
-	BUILD_BUG_ON(FIELD_SIZEOF(struct __sk_buff, cb) !=
-		     FIELD_SIZEOF(struct qdisc_skb_cb, data));
+	BUILD_BUG_ON(sizeof_field(struct __sk_buff, cb) != BPF_SKB_CB_LEN);
+	BUILD_BUG_ON(sizeof_field(struct __sk_buff, cb) !=
+		     sizeof_field(struct qdisc_skb_cb, data));
 
 	return qdisc_skb_cb(skb)->data;
 }

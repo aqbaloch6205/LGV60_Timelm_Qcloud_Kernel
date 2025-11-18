@@ -972,7 +972,6 @@ static int tcp_v4_send_synack(const struct sock *sk, struct dst_entry *dst,
 			      struct tcp_fastopen_cookie *foc,
 			      enum tcp_synack_type synack_type,
 			      struct sk_buff *syn_skb)
-			      
 {
 	const struct inet_request_sock *ireq = inet_rsk(req);
 	struct flowi4 fl4;

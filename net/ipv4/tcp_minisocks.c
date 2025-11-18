@@ -553,7 +553,6 @@ struct sock *tcp_create_openreq_child(const struct sock *sk,
 		newtp->retrans_stamp = div_u64(treq->snt_synack,
 					       USEC_PER_SEC / TCP_TS_HZ);
 	}
-	
 	newtp->tsoffset = treq->ts_off;
 #ifdef CONFIG_TCP_MD5SIG
 	newtp->md5sig_info = NULL;	/*XXX*/

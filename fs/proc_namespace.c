@@ -98,7 +98,7 @@ static inline void mangle(struct seq_file *m, const char *s)
 static void show_type(struct seq_file *m, struct super_block *sb)
 {
 	mangle(m, sb->s_type->name);
-	if (sb->s_subtype && sb->s_subtype[0]) {
+	if (sb->s_subtype) {
 		seq_putc(m, '.');
 		mangle(m, sb->s_subtype);
 	}
@@ -141,7 +141,7 @@ static int show_vfsmnt(struct seq_file *m, struct vfsmount *mnt)
 		goto out;
 	show_mnt_opts(m, mnt);
 	if (sb->s_op->show_options2)
-			err = sb->s_op->show_options2(mnt, m, mnt_path.dentry);
+		err = sb->s_op->show_options2(mnt, m, mnt_path.dentry);
 	else if (sb->s_op->show_options)
 		err = sb->s_op->show_options(m, mnt_path.dentry);
 	seq_puts(m, " 0 0\n");

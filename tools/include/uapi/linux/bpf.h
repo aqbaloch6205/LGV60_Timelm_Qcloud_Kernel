@@ -151,7 +151,6 @@ enum bpf_map_type {
 	BPF_MAP_TYPE_STRUCT_OPS,
 	BPF_MAP_TYPE_RINGBUF,
 	BPF_MAP_TYPE_INODE_STORAGE,
-	BPF_MAP_TYPE_TASK_STORAGE,
 };
 
 /* Note that tracing related programs such as
@@ -900,6 +899,7 @@ union bpf_attr {
  * 		for updates resulting in a null checksum the value is set to
  * 		**CSUM_MANGLED_0** instead. Flag **BPF_F_PSEUDO_HDR** indicates
  * 		the checksum is to be computed against a pseudo-header.
+ * 		Flag **BPF_F_IPV6** should be set for IPv6 packets.
  *
  * 		This helper works in combination with **bpf_csum_diff**\ (),
  * 		which does not update the checksum in-place, but offers more
@@ -3681,50 +3681,6 @@ union bpf_attr {
  * 	Return
  * 		The helper returns **TC_ACT_REDIRECT** on success or
  * 		**TC_ACT_SHOT** on error.
- *
- * void *bpf_task_storage_get(struct bpf_map *map, struct task_struct *task, void *value, u64 flags)
- *	Description
- *		Get a bpf_local_storage from the *task*.
- *
- *		Logically, it could be thought of as getting the value from
- *		a *map* with *task* as the **key**.  From this
- *		perspective,  the usage is not much different from
- *		**bpf_map_lookup_elem**\ (*map*, **&**\ *task*) except this
- *		helper enforces the key must be an task_struct and the map must also
- *		be a **BPF_MAP_TYPE_TASK_STORAGE**.
- *
- *		Underneath, the value is stored locally at *task* instead of
- *		the *map*.  The *map* is used as the bpf-local-storage
- *		"type". The bpf-local-storage "type" (i.e. the *map*) is
- *		searched against all bpf_local_storage residing at *task*.
- *
- *		An optional *flags* (**BPF_LOCAL_STORAGE_GET_F_CREATE**) can be
- *		used such that a new bpf_local_storage will be
- *		created if one does not exist.  *value* can be used
- *		together with **BPF_LOCAL_STORAGE_GET_F_CREATE** to specify
- *		the initial value of a bpf_local_storage.  If *value* is
- *		**NULL**, the new bpf_local_storage will be zero initialized.
- *	Return
- *		A bpf_local_storage pointer is returned on success.
- *
- *		**NULL** if not found or there was an error in adding
- *		a new bpf_local_storage.
- *
- * long bpf_task_storage_delete(struct bpf_map *map, struct task_struct *task)
- *	Description
- *		Delete a bpf_local_storage from a *task*.
- *	Return
- *		0 on success.
- *
- *		**-ENOENT** if the bpf_local_storage cannot be found.
- *
- * struct task_struct *bpf_get_current_task_btf(void)
- *	Description
- *		Return a BTF pointer to the "current" task.
- *		This pointer can also be used in helpers that accept an
- *		*ARG_PTR_TO_BTF_ID* of type *task_struct*.
- *	Return
- *		Pointer to the current task.
  */
 #define __BPF_FUNC_MAPPER(FN)		\
 	FN(unspec),			\
@@ -3883,9 +3839,6 @@ union bpf_attr {
 	FN(per_cpu_ptr),		\
 	FN(this_cpu_ptr),		\
 	FN(redirect_peer),		\
-	FN(task_storage_get),		\
-	FN(task_storage_delete),	\
-	FN(get_current_task_btf),	\
 	/* */
 
 /* integer value in 'imm' field of BPF_CALL instruction selects which helper
@@ -3918,6 +3871,7 @@ enum {
 	BPF_F_PSEUDO_HDR		= (1ULL << 4),
 	BPF_F_MARK_MANGLED_0		= (1ULL << 5),
 	BPF_F_MARK_ENFORCE		= (1ULL << 6),
+	BPF_F_IPV6			= (1ULL << 7),
 };
 
 /* BPF_FUNC_clone_redirect and BPF_FUNC_redirect flags. */
@@ -4986,7 +4940,10 @@ struct bpf_pidns_info {
 
 /* User accessible data for SK_LOOKUP programs. Add new fields at the end. */
 struct bpf_sk_lookup {
-	__bpf_md_ptr(struct bpf_sock *, sk); /* Selected socket */
+	union {
+		__bpf_md_ptr(struct bpf_sock *, sk); /* Selected socket */
+		__u64 cookie; /* Non-zero if socket was selected in PROG_TEST_RUN */
+	};
 
 	__u32 family;		/* Protocol family (AF_INET, AF_INET6) */
 	__u32 protocol;		/* IP protocol (IPPROTO_TCP, IPPROTO_UDP) */

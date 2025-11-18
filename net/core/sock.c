@@ -514,7 +514,7 @@ int __sk_receive_skb(struct sock *sk, struct sk_buff *skb,
 
 		rc = sk_backlog_rcv(sk, skb);
 
-		mutex_release(&sk->sk_lock.dep_map, 1, _RET_IP_);
+		mutex_release(&sk->sk_lock.dep_map, _RET_IP_);
 	} else if (sk_add_backlog(sk, skb, sk->sk_rcvbuf)) {
 		bh_unlock_sock(sk);
 		atomic_inc(&sk->sk_drops);
@@ -1215,7 +1215,7 @@ static int sk_getsockopt(struct sock *sk, int level, int optname,
 		break;
 
 	case SO_RCVBUF:
-		v.val = sk->sk_rcvbuf;
+		v.val = READ_ONCE(sk->sk_rcvbuf);
 		break;
 
 	case SO_REUSEADDR:
@@ -1368,8 +1368,8 @@ static int sk_getsockopt(struct sock *sk, int level, int optname,
 		break;
 
 	case SO_PEERSEC:
-		return security_socket_getpeersec_stream(sock, optval.user, optlen.user, len);
-
+		return security_socket_getpeersec_stream(sock,
+							 optval, optlen, len);							 
 	case SO_MARK:
 		v.val = sk->sk_mark;
 		break;
@@ -1509,24 +1509,7 @@ int sock_getsockopt(struct socket *sock, int level, int optname,
  */
 static inline void sock_lock_init(struct sock *sk)
 {
-#ifdef CONFIG_LGP_DATA_TCPIP_MPTCP
-#ifdef CONFIG_MPTCP
-	/* Reclassify the lock-class for subflows */
-	if (sk->sk_type == SOCK_STREAM && sk->sk_protocol == IPPROTO_TCP)
-		if (mptcp(tcp_sk(sk)) || tcp_sk(sk)->is_master_sk) {
-			sock_lock_init_class_and_name(sk, meta_slock_key_name,
-						      &meta_slock_key,
-						      meta_key_name,
-						      &meta_key);
-
-			/* We don't yet have the mptcp-point.
-			 * Thus we still need inet_sock_destruct
-			 */
-			sk->sk_destruct = inet_sock_destruct;
-			return;
-		}
-#endif
-#endif
+	sk_owner_clear(sk);	
 
 	if (sk->sk_kern_sock)
 		sock_lock_init_class_and_name(
@@ -1622,6 +1605,9 @@ static void sk_prot_free(struct proto *prot, struct sock *sk)
 	cgroup_sk_free(&sk->sk_cgrp_data);
 	mem_cgroup_sk_free(sk);
 	security_sk_free(sk);
+
+	sk_owner_put(sk);
+
 	if (slab != NULL)
 		kmem_cache_free(slab, sk);
 	else
@@ -1852,6 +1838,21 @@ struct sock *sk_clone_lock(const struct sock *sk, const gfp_t priority)
 			goto out;
 		}
 		RCU_INIT_POINTER(newsk->sk_reuseport_cb, NULL);
+#ifdef CONFIG_BPF_SYSCALL
+		RCU_INIT_POINTER(newsk->sk_bpf_storage, NULL);
+#endif
+
+		if (bpf_sk_storage_clone(sk, newsk)) {
+			sk_free_unlock_clone(newsk);
+			newsk = NULL;
+			goto out;
+		}
+
+		/* Clear sk_user_data if parent had the pointer tagged
+		 * as not suitable for copying when cloning.
+		 */
+		if (sk_user_data_is_nocopy(newsk))
+			RCU_INIT_POINTER(newsk->sk_user_data, NULL);
 
 		if (bpf_sk_storage_clone(sk, newsk)) {
 			sk_free_unlock_clone(newsk);
@@ -3350,7 +3351,7 @@ static void assign_proto_idx(struct proto *prot)
 {
 	prot->inuse_idx = find_first_zero_bit(proto_inuse_idx, PROTO_INUSE_NR);
 
-	if (unlikely(prot->inuse_idx == PROTO_INUSE_NR - 1)) {
+	if (unlikely(prot->inuse_idx == PROTO_INUSE_NR)) {
 		pr_err("PROTO_INUSE_NR exhausted\n");
 		return;
 	}
@@ -3360,7 +3361,7 @@ static void assign_proto_idx(struct proto *prot)
 
 static void release_proto_idx(struct proto *prot)
 {
-	if (prot->inuse_idx != PROTO_INUSE_NR - 1)
+	if (prot->inuse_idx != PROTO_INUSE_NR)
 		clear_bit(prot->inuse_idx, proto_inuse_idx);
 }
 #else
