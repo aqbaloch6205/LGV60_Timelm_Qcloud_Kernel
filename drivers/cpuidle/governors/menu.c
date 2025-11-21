@@ -276,7 +276,6 @@ again:
 	 * unless there is a clear indication that the given CPU is most likley
 	 * going to be woken up shortly.
 	 */
-
 	if (divisor * 4 <= INTERVALS * 3)
 		return UINT_MAX;
 
