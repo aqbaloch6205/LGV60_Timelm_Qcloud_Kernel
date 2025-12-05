@@ -23,7 +23,7 @@
 #include "internal.h"
 
 #ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
-bool susfs_hide_sus_mnts_for_all_procs = true; // hide sus mounts for all processes by default
+extern bool susfs_hide_sus_mnts_for_all_procs;
 #endif
 
 
