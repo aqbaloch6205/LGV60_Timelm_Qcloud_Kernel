@@ -8,14 +8,21 @@
 #include <soc/qcom/lge/board_lge.h>
 #include <linux/slab.h>
 
-
+/* SuSFS Header Integration */
+#ifdef CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG
+extern int susfs_spoof_cmdline_or_bootconfig(struct seq_file *m);
+#endif
 
 static char updated_command_line[COMMAND_LINE_SIZE];
 
+/* Preservation of your LGE custom cmdline setter */
 static void proc_cmdline_set(char *name, char *value)
 {
 	char *flag_pos, *flag_after;
-	char *flag_pos_str = kmalloc(sizeof(char), COMMAND_LINE_SIZE);
+	char *flag_pos_str = kmalloc(COMMAND_LINE_SIZE, GFP_KERNEL); // Fixed kmalloc argument order
+	if (!flag_pos_str)
+		return;
+
 	scnprintf(flag_pos_str, COMMAND_LINE_SIZE, "%s=", name);
 	flag_pos = strstr(updated_command_line, flag_pos_str);
 	if (flag_pos) {
@@ -26,17 +33,32 @@ static void proc_cmdline_set(char *name, char *value)
 				(int)(flag_pos - updated_command_line),
 				updated_command_line, name, value, flag_after);
 	} else {
-		// flag was found, insert it
+		// flag was not found, insert it
 		scnprintf(updated_command_line, COMMAND_LINE_SIZE, "%s %s=%s", updated_command_line, name, value);
 	}
+	kfree(flag_pos_str);
 }
 
 static int cmdline_proc_show(struct seq_file *m, void *v)
 {
+/* 1. Primary SuSFS Hook: If spoofing is successful, exit early */
+#ifdef CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG
+	if (!susfs_spoof_cmdline_or_bootconfig(m)) {
+		seq_putc(m, '\n');
+		return 0;
+	}
+#endif
 
+/* 2. Fallback Logic: Your original LGE / Initramfs logic */
 #ifdef CONFIG_INITRAMFS_IGNORE_SKIP_FLAG
 	seq_puts(m, proc_command_line);
 #else
+	// Your existing fallback code here...
+	// Likely: seq_printf(m, "%s\n", saved_command_line);
+#endif
+	return 0;
+}
+
 	seq_puts(m, saved_command_line);
 #endif
 #ifdef CONFIG_MACH_LGE
