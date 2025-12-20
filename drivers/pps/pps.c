@@ -403,6 +403,8 @@ int pps_register_cdev(struct pps_device *pps)
 	err = device_register(&pps->dev);
 	if (err)
 
+		goto free_idr;
+
 	pr_debug("source %s got cdev (%d:%d)\n", pps->info.name, pps_major,
 		 pps->id);
 
