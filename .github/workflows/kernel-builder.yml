@@ -1,0 +1,70 @@
+name: Build ARM64 Kernel (Clang Only)
+
+on:
+  workflow_dispatch:
+    # Manual trigger
+  push:
+    branches: [ main ]
+
+env:
+  KERNEL_DEFCONFIG: vendor/arabella_defconfig
+  KERNEL_VERSION: "Bhazheng-LMV600"
+  CLANG_URL: https://android.googlesource.com/platform//prebuilts/clang/host/linux-x86/+archive/ba7da711271d310dda6b5134d8f4448f6a276a27/clang-r498229b.tar.gz
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 90
+
+    steps:
+    - name: Checkout Kernel Source
+      uses: actions/checkout@v4
+      with:
+        path: kernel
+        fetch-depth: 1
+
+    - name: Install Dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y git build-essential flex bison libssl-dev libelf-dev bc python3 python3-pip \
+          cpio rsync kmod lz4 zip unzip ccache libncurses-dev wget
+
+    - name: Setup CCACHE
+      uses: hendrikmuhs/ccache-action@v1.2.9
+      with:
+        key: ${{ github.run_id }}
+        max-size: 2G
+
+    - name: Download Neutron Clang
+      run: |
+        mkdir -p clang-r498229b
+        wget -qO clang.tar.gz ${{ env.CLANG_URL }}
+        tar -xf clang.tar.gz -C clang-r498229b --strip-components=1
+        rm clang.tar.gz
+        export PATH="$PWD/clang-r498229b/bin:$PATH"
+
+    - name: Kernel Defconfig
+      run: |
+        cd kernel
+        mkdir -p out
+        make O=out ARCH=arm64 ${{ env.KERNEL_DEFCONFIG }}
+
+    - name: Compile Kernel
+      run: |
+        cd kernel
+        echo "Starting kernel compilation..."
+        set -o pipefail
+        make -j$(nproc) O=out ARCH=arm64 \
+          CC=clang \
+          CLANG_TRIPLE=aarch64-linux-gnu- \
+          LLVM_IAS=1 2>&1 | tee build.log
+
+        # Save errors separately for review
+        grep -i "error:" build.log || true
+
+    - name: Upload Logs
+      uses: actions/upload-artifact@v4
+      with:
+        name: kernel-build-${{ github.run_id }}
+        path: |
+          kernel/build.log
