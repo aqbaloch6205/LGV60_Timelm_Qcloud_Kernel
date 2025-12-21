@@ -14,18 +14,10 @@
 #include <linux/input.h>
 #include <linux/time.h>
 #include <linux/sysfs.h>
-#include <linux/printk.h>
 
 #define cpu_boost_attr_rw(_name)		\
 static struct kobj_attribute _name##_attr =	\
 __ATTR(_name, 0644, show_##_name, store_##_name)
-
-#ifdef CONFIG_SCHED_CAS
-#define cpu_boost_cas_attr_rw(_name)		\
-static struct kobj_attribute _name##_attr =	\
-__ATTR(_name, 0664, show_##_name, store_##_name)
-#endif /* CONFIG_SCHED_CAS */
-
 
 #define show_one(file_name)			\
 static ssize_t show_##file_name			\
@@ -48,6 +40,7 @@ struct cpu_sync {
 	int cpu;
 	unsigned int input_boost_min;
 	unsigned int input_boost_freq;
+	unsigned int powerkey_input_boost_freq;
 };
 
 static DEFINE_PER_CPU(struct cpu_sync, sync_info);
@@ -55,6 +48,7 @@ static struct workqueue_struct *cpu_boost_wq;
 
 static struct work_struct input_boost_work;
 
+static struct work_struct powerkey_input_boost_work;
 static bool input_boost_enabled;
 
 static unsigned int input_boost_ms = 40;
@@ -62,65 +56,25 @@ show_one(input_boost_ms);
 store_one(input_boost_ms);
 cpu_boost_attr_rw(input_boost_ms);
 
-#ifdef CONFIG_SCHED_CAS
-static unsigned int cas_boost_status = 0;
-static unsigned int cas_feature_enable = 1;
-#define store_one_cas(file_name)								\
-static ssize_t store_##file_name								\
-(struct kobject *kobj, struct kobj_attribute *attr,				\
-const char *buf, size_t count)									\
-{																\
-																\
-	sscanf(buf, "%u", &file_name);								\
-	if (cas_feature_enable) {									\
-		if (cas_boost_status != 0) {						 	\
-			schedtune_set_touch_boost(0);						\
-		} else {												\
-			schedtune_set_touch_boost(1);						\
-		}														\
-	}															\
-																\
-	return count;												\
-}
-
-#define store_one_cas_enable(file_name)							\
-static ssize_t store_##file_name								\
-(struct kobject *kobj, struct kobj_attribute *attr,				\
-const char *buf, size_t count)									\
-{																\
-																\
-	sscanf(buf, "%u", &file_name);								\
-	if (cas_feature_enable == 0) {								\
-		schedtune_set_touch_boost(0);								\
-	} else {													\
-		schedtune_set_touch_boost(1);								\
-	}															\
-																\
-	return count;												\
-}
-
-show_one(cas_boost_status);
-store_one_cas(cas_boost_status);
-cpu_boost_cas_attr_rw(cas_boost_status);
-
-show_one(cas_feature_enable);
-store_one_cas_enable(cas_feature_enable);
-cpu_boost_cas_attr_rw(cas_feature_enable);
-
-#endif /* CONFIG_SCHED_CAS */
+static unsigned int powerkey_input_boost_ms = 400;
+show_one(powerkey_input_boost_ms);
+store_one(powerkey_input_boost_ms);
+cpu_boost_attr_rw(powerkey_input_boost_ms);
 
 static unsigned int sched_boost_on_input;
 show_one(sched_boost_on_input);
 store_one(sched_boost_on_input);
 cpu_boost_attr_rw(sched_boost_on_input);
 
+
+static bool sched_boost_on_powerkey_input = true;
+show_one(sched_boost_on_powerkey_input);
+store_one(sched_boost_on_powerkey_input);
+cpu_boost_attr_rw(sched_boost_on_powerkey_input);
+
 static bool sched_boost_active;
 
 static struct delayed_work input_boost_rem;
-#ifdef CONFIG_SCHED_CAS
-static unsigned int input_schedtune_boost_ms = 1500;
-static struct delayed_work input_schedtune_boost;
-#endif /* CONFIG_SCHED_CAS */
 static u64 last_input_time;
 #define MIN_INPUT_INTERVAL (150 * USEC_PER_MSEC)
 
@@ -189,23 +143,9 @@ static ssize_t show_input_boost_freq(struct kobject *kobj,
 }
 
 cpu_boost_attr_rw(input_boost_freq);
-
-#ifdef CONFIG_SCHED_MULTI_STEP_BOOST
-static DEFINE_PER_CPU(unsigned int, sub_boost_freq);
-
-#define MIN_INPUT_INTERVAL_MS 40
-#define MIN_INPUT_INTERVAL_US (MIN_INPUT_INTERVAL_MS * USEC_PER_MSEC)
-#define MAX_PRECEDING_BOOST_TIME 200
-
-static bool sub_boost_enabled = false;
-static unsigned int prec_boost_ms = 0;
-static unsigned int boost_step = 0;
-
-static struct work_struct input_boost_multi_step_work;
-
-static ssize_t store_sub_boost_freq(struct kobject *kobj,
-                      struct kobj_attribute *attr,
-                      const char *buf, size_t count)
+static ssize_t store_powerkey_input_boost_freq(struct kobject *kobj,
+				      struct kobj_attribute *attr,
+				      const char *buf, size_t count)
 {
 	int i, ntokens = 0;
 	unsigned int val, cpu;
@@ -220,7 +160,7 @@ static ssize_t store_sub_boost_freq(struct kobject *kobj,
 		if (sscanf(buf, "%u\n", &val) != 1)
 			return -EINVAL;
 		for_each_possible_cpu(i)
-			per_cpu(sub_boost_freq, i) = val;
+			per_cpu(sync_info, i).powerkey_input_boost_freq = val;
 		goto check_enable;
 	}
 
@@ -234,41 +174,42 @@ static ssize_t store_sub_boost_freq(struct kobject *kobj,
 			return -EINVAL;
 		if (cpu >= num_possible_cpus())
 			return -EINVAL;
-
-		per_cpu(sub_boost_freq, cpu) = val;
-		cp = strchr(cp, ' ');
+		per_cpu(sync_info, cpu).powerkey_input_boost_freq = val;
+		cp = strnchr(cp, PAGE_SIZE - (cp - buf), ' ');
 		cp++;
 	}
 
 check_enable:
 	for_each_possible_cpu(i) {
-		if (per_cpu(sub_boost_freq, i)) {
+		if (per_cpu(sync_info, i).powerkey_input_boost_freq) {
 			enabled = true;
 			break;
 		}
 	}
-	sub_boost_enabled = enabled;
+	input_boost_enabled = enabled;
 
 	return count;
 }
 
-static ssize_t show_sub_boost_freq(struct kobject *kobj,
-                     struct kobj_attribute *attr, char *buf)
+static ssize_t show_powerkey_input_boost_freq(struct kobject *kobj,
+				     struct kobj_attribute *attr, char *buf)
 {
 	int cnt = 0, cpu;
-	unsigned int val;
+	struct cpu_sync *s;
+	unsigned int boost_freq = 0;
 
 	for_each_possible_cpu(cpu) {
-		val = per_cpu(sub_boost_freq, cpu);
+		s = &per_cpu(sync_info, cpu);
+		boost_freq = s->powerkey_input_boost_freq;
 		cnt += snprintf(buf + cnt, PAGE_SIZE - cnt,
-				"%d:%u ", cpu, val);
+				"%d:%u ", cpu, boost_freq);
 	}
 	cnt += snprintf(buf + cnt, PAGE_SIZE - cnt, "\n");
 	return cnt;
 }
 
-cpu_boost_attr_rw(sub_boost_freq);
-#endif /* CONFIG_SCHED_MULTI_STEP_BOOST */
+
+cpu_boost_attr_rw(powerkey_input_boost_freq);
 
 /*
  * The CPUFREQ_ADJUST notifier is used to override the current policy min to
@@ -319,18 +260,6 @@ static void update_policy_online(void)
 	put_online_cpus();
 }
 
-#ifdef CONFIG_SCHED_CAS
-static void do_input_schedtune_boost(struct work_struct *work){
-	if (cas_feature_enable) {
-		if (cas_boost_status != 0) {
-			schedtune_set_touch_boost(0);
-		} else {
-			schedtune_set_touch_boost(1);
-		}
-	}
-}
-#endif /* CONFIG_SCHED_CAS */
-
 static void do_input_boost_rem(struct work_struct *work)
 {
 	unsigned int i, ret;
@@ -352,16 +281,6 @@ static void do_input_boost_rem(struct work_struct *work)
 			pr_err("cpu-boost: sched boost disable failed\n");
 		sched_boost_active = false;
 	}
-
-#ifdef CONFIG_SCHED_MULTI_STEP_BOOST
-	boost_step = 0;
-#endif /* CONFIG_SCHED_MULTI_STEP_BOOST */
-
-#ifdef CONFIG_SCHED_CAS
-	queue_delayed_work(cpu_boost_wq, &input_schedtune_boost,
-					msecs_to_jiffies(input_schedtune_boost_ms));
-#endif /* CONFIG_SCHED_CAS */
-
 }
 
 static void do_input_boost(struct work_struct *work)
@@ -398,80 +317,41 @@ static void do_input_boost(struct work_struct *work)
 					msecs_to_jiffies(input_boost_ms));
 }
 
-#ifdef CONFIG_SCHED_MULTI_STEP_BOOST
-static void do_input_boost_multi_step(struct work_struct *work)
+static void do_powerkey_input_boost(struct work_struct *work)
 {
+
 	unsigned int i, ret;
 	struct cpu_sync *i_sync_info;
 
 	cancel_delayed_work_sync(&input_boost_rem);
-
-#ifdef CONFIG_SCHED_CAS
-	if (cas_feature_enable) {
-		if (cas_boost_status == 0 || cas_boost_status == 2) {
-			schedtune_set_touch_boost(30);
-		} else if (cas_boost_status == 1) {
-			schedtune_set_touch_boost(1);
-		} else {
-			schedtune_set_touch_boost(0);
-		}
+	if (sched_boost_active) {
+		sched_set_boost(0);
+		sched_boost_active = false;
 	}
-#endif
 
-	if (boost_step == 0) {
-		// step 1
-		pr_debug("Multi step boost: step 1\n");
-		if (sched_boost_active) {
-			sched_set_boost(0);
-			sched_boost_active = false;
-		}
+	/* Set the powerkey_input_boost_min for all CPUs in the system */
+	pr_debug("Setting powerkey input boost min for all CPUs\n");
+	for_each_possible_cpu(i) {
+		i_sync_info = &per_cpu(sync_info, i);
+		i_sync_info->input_boost_min =
+			i_sync_info->powerkey_input_boost_freq;
+	}
 
-		for_each_possible_cpu(i) {
-			i_sync_info = &per_cpu(sync_info, i);
-			i_sync_info->input_boost_min = i_sync_info->input_boost_freq;
-		}
+	/* Update policies for all online CPUs */
+	update_policy_online();
 
-		update_policy_online();
-
-		if (sched_boost_on_input > 0) {
-			ret = sched_set_boost(sched_boost_on_input);
-			if (ret)
-				pr_err("cpu-boost: HMP boost enable failed\n");
-			else
-				sched_boost_active = true;
-		}
-
-		if (sub_boost_enabled) {
-			boost_step = 1;
-			prec_boost_ms = 0;
-		}
-	} else if (boost_step == 1) {
-		// step 2
-		prec_boost_ms += MIN_INPUT_INTERVAL_MS;
-		if (prec_boost_ms >= MAX_PRECEDING_BOOST_TIME) {
-			pr_debug("Multi step boost: step 2\n");
-			for_each_possible_cpu(i) {
-				i_sync_info = &per_cpu(sync_info, i);
-				i_sync_info->input_boost_min = per_cpu(sub_boost_freq, i);
-			}
-
-			update_policy_online();
-
-			if (sched_boost_active) {
-				ret = sched_set_boost(0);
-				if (ret)
-					pr_err("cpu-boost: HMP boost disable failed\n");
-				sched_boost_active = false;
-			}
-
-			boost_step = 2;
-		}
+	/* Enable scheduler boost to migrate tasks to big cluster */
+	if (sched_boost_on_powerkey_input) {
+		ret = sched_set_boost(1);
+		if (ret)
+			pr_err("cpu-boost: HMP boost enable failed\n");
+		else
+			sched_boost_active = true;
 	}
 
 	queue_delayed_work(cpu_boost_wq, &input_boost_rem,
-					msecs_to_jiffies(input_boost_ms));
+				msecs_to_jiffies(powerkey_input_boost_ms));
 }
-#endif /* CONFIG_SCHED_MULTI_STEP_BOOST */
 
 static void cpuboost_input_event(struct input_handle *handle,
 		unsigned int type, unsigned int code, int value)
@@ -481,20 +361,27 @@ static void cpuboost_input_event(struct input_handle *handle,
 	if (!input_boost_enabled)
 		return;
 
-#ifdef CONFIG_SCHED_MULTI_STEP_BOOST
-	{ // multi-step boost
-		now = ktime_to_us(ktime_get());
-		if (now - last_input_time < MIN_INPUT_INTERVAL_US)
-			return;
-
-		if (work_pending(&input_boost_multi_step_work))
-			return;
-
-		queue_work(cpu_boost_wq, &input_boost_multi_step_work);
-		last_input_time = ktime_to_us(ktime_get());
+	now = ktime_to_us(ktime_get());
+	if (now - last_input_time < MIN_INPUT_INTERVAL)
 		return;
-	}
-#endif /* CONFIG_SCHED_MULTI_STEP_BOOST */
+
+	if (work_pending(&input_boost_work))
+		return;
+
+	if (type == EV_KEY && code == KEY_POWER)
+		queue_work(cpu_boost_wq, &powerkey_input_boost_work);
+	else
+		queue_work(cpu_boost_wq, &input_boost_work);
+
+	last_input_time = ktime_to_us(ktime_get());
+}
+
+void touch_irq_boost(void)
+{
+	u64 now;
+
+	if (!input_boost_enabled)
+		return;
 
 	now = ktime_to_us(ktime_get());
 	if (now - last_input_time < MIN_INPUT_INTERVAL)
@@ -504,8 +391,10 @@ static void cpuboost_input_event(struct input_handle *handle,
 		return;
 
 	queue_work(cpu_boost_wq, &input_boost_work);
+
 	last_input_time = ktime_to_us(ktime_get());
 }
+EXPORT_SYMBOL(touch_irq_boost);
 
 static int cpuboost_input_connect(struct input_handler *handler,
 		struct input_dev *dev, const struct input_device_id *id)
@@ -589,15 +478,8 @@ static int cpu_boost_init(void)
 		return -EFAULT;
 
 	INIT_WORK(&input_boost_work, do_input_boost);
+	INIT_WORK(&powerkey_input_boost_work, do_powerkey_input_boost);
 	INIT_DELAYED_WORK(&input_boost_rem, do_input_boost_rem);
-
-#ifdef CONFIG_SCHED_MULTI_STEP_BOOST
-	INIT_WORK(&input_boost_multi_step_work, do_input_boost_multi_step);
-#endif /* CONFIG_SCHED_MULTI_STEP_BOOST */
-
-#ifdef CONFIG_SCHED_CAS
-	INIT_DELAYED_WORK(&input_schedtune_boost, do_input_schedtune_boost);
-#endif /* CONFIG_SCHED_CAS */
 
 	for_each_possible_cpu(cpu) {
 		s = &per_cpu(sync_info, cpu);
@@ -614,30 +496,32 @@ static int cpu_boost_init(void)
 	if (ret)
 		pr_err("Failed to create input_boost_ms node: %d\n", ret);
 
+	ret = sysfs_create_file(cpu_boost_kobj,
+				&powerkey_input_boost_ms_attr.attr);
+	if (ret)
+		pr_err("Failed to create powerkey_input_boost_ms node: %d\n",
+			ret);
+
 	ret = sysfs_create_file(cpu_boost_kobj, &input_boost_freq_attr.attr);
 	if (ret)
 		pr_err("Failed to create input_boost_freq node: %d\n", ret);
+
+	ret = sysfs_create_file(cpu_boost_kobj,
+				&powerkey_input_boost_freq_attr.attr);
+	if (ret)
+		pr_err("Failed to create powerkey_input_boost_freq node: %d\n",
+			ret);
 
 	ret = sysfs_create_file(cpu_boost_kobj,
 				&sched_boost_on_input_attr.attr);
 	if (ret)
 		pr_err("Failed to create sched_boost_on_input node: %d\n", ret);
 
-#ifdef CONFIG_SCHED_MULTI_STEP_BOOST
-    ret = sysfs_create_file(cpu_boost_kobj, &sub_boost_freq_attr.attr);
-    if (ret)
-        pr_err("Failed to create sub_boost_freq node: %d\n", ret);
-#endif /* CONFIG_SCHED_MULTI_STEP_BOOST */
-
-#ifdef CONFIG_SCHED_CAS
-    ret = sysfs_create_file(cpu_boost_kobj, &cas_boost_status_attr.attr);
-    if (ret)
-        pr_err("Failed to create cas_boost_status node: %d\n", ret);
-
-    ret = sysfs_create_file(cpu_boost_kobj, &cas_feature_enable_attr.attr);
-    if (ret)
-        pr_err("Failed to create cas_feature_enable node: %d\n", ret);
-#endif /* CONFIG_SCHED_CAS */
+	ret = sysfs_create_file(cpu_boost_kobj,
+				&sched_boost_on_powerkey_input_attr.attr);
+	if (ret)
+		pr_err("Failed to create sched_boost_on_powerkey_input node: %d\n",
+			ret);
 
 	ret = input_register_handler(&cpuboost_input_handler);
 	return 0;
