@@ -193,10 +193,7 @@ obj-$(CONFIG_TSPDRV)              += tspdrv/
 obj-$(CONFIG_SIOX)		+= siox/
 obj-$(CONFIG_GNSS)		+= gnss/
 obj-$(CONFIG_SENSORS_SSC)	+= sensors/
-
 ifeq ($(CONFIG_TRUSTONIC_TEE),y)
 obj-$(CONFIG_TRUSTONIC_TEE) += gud/
 endif
-
-
-
+obj-$(CONFIG_XIAOMI_MIUI)	+= xiaomi/
