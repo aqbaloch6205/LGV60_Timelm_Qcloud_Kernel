@@ -4,7 +4,7 @@ set -euo pipefail
 
 TOOLCHAIN_PATH="$HOME/zyc-clang/bin"
 OUT_DIR="out"
-DEFCONFIG="vendor/jhatpat_defconfig"
+DEFCONFIG="vendor/arabella_defconfig"
 
 # Check toolchain
 if [ ! -d "$TOOLCHAIN_PATH" ]; then
