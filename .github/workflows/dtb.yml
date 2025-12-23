@@ -1,60 +1,45 @@
-name: Build Kernel dtb only 
+name: Clone and Zip LGE Vendor
 
 on:
-  workflow_dispatch:
-
-env:
-  DEVICE: 'timelm'
+  workflow_dispatch: # Allows manual trigger from the Actions tab
 
 jobs:
   build:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout source
-      uses: actions/checkout@v4
-      with:
-        fetch-depth: 1
+      # 1. Install necessary tools to ensure they are available and up to date
+      - name: Install System Tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y git zip
 
-    - name: Install dependencies
-      run: |
-        sudo apt update
-        sudo apt install -y build-essential git curl wget bison flex zip bc cpio libssl-dev ccache python-is-python3 tar
+      # 2. Clone the external repository (Only the finalwork branch)
+      - name: Clone External Kernel Repo
+        run: |
+          git clone --depth 1 --branch finalwork https://github.com/rofikkerneldev/lgv60nextgen_rofikkernel.git kernel_dir
 
-    - name: Set short commit SHA
-      id: vars
-      run: echo "SHORT_SHA=$(echo ${GITHUB_SHA} | cut -c1-8)" >> $GITHUB_ENV
+      # 3. Create the Zip file of only the target folder
+      - name: Zip LGE Folder
+        run: |
+          # Define the specific internal path
+          TARGET="kernel_dir/arch/arm64/boot/dts/vendor/lge"
+          
+          if [ -d "$TARGET" ]; then
+            echo "Path exists. Starting compression..."
+            # -j flag flattens the directory structure if you only want the files
+            # Remove -j if you want to keep the full internal folder path
+            zip -r lge_vendor_boot.zip "$TARGET"
+          else
+            echo "Error: Path $TARGET not found in the repository!"
+            exit 1
+          fi
 
-    - name: Cache ccache
-      uses: actions/cache@v4
-      with:
-        path: ~/.cache/ccache_mikernel
-        key: ${{ runner.os }}-ccache-${{ env.DEVICE }}-${{ env.SHORT_SHA }}
-        restore-keys: |
-          ${{ runner.os }}-ccache-${{ env.DEVICE }}-
-          ${{ runner.os }}-ccache-
-
-    - name: Setup zyc-clang toolchain
-      run: |
-        mkdir -p $HOME/zyc-clang
-        cd $HOME/zyc-clang
-        wget https://github.com/ZyCromerZ/Clang/releases/download/15.0.7-20251111-release/Clang-15.0.7-20251111.tar.gz
-        tar -zxvf Clang-15.0.7-20251111.tar.gz
-        cd $GITHUB_WORKSPACE
-
-    - name: Build kernel
-      run: |
-        bash dtbbuild.sh ${{ env.DEVICE }}
-
-    - name: Show ccache stats
-      run: ccache -s
-
-    - name: Upload build artifacts
-      uses: actions/upload-artifact@v4
-      with:
-        name: ${{ env.DEVICE }}-kernel
-        path: |
-          *.zip
-          out/arch/arm64/boot/Image
-          out/arch/arm64/boot/dtb*
+      # 4. Upload the zip as a downloadable artifact
+      - name: Upload Result
+        uses: actions/upload-artifact@v4
+        with:
+          name: LGE-Vendor-DTS
+          path: lge_vendor_boot.zip
+          retention-days: 5
           
