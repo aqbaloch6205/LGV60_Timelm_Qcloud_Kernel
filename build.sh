@@ -3,8 +3,8 @@ set -e
 
 # Toolchain and identity
 TOOLCHAIN_PATH=$HOME/zyc-clang/bin
-export KBUILD_BUILD_USER="Bhazheng"
-export KBUILD_BUILD_HOST="cachyos"
+export KBUILD_BUILD_USER="QCloudfx"
+export KBUILD_BUILD_HOST="Abdul-Qadeer"
 export ARCH=arm64
 export SUBARCH=arm64
 export PATH="$TOOLCHAIN_PATH:$PATH"
