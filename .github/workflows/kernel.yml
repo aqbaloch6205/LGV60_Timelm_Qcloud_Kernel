@@ -1,71 +1,60 @@
-name: LG SM8250 Kernel Build (ZyCromerZ Mimic)
+name: Build Kernel
 
 on:
   workflow_dispatch:
 
 jobs:
   build:
-    runs-on: ubuntu-22.04 # Use 22.04 to match the Xiaomi builder
+    runs-on: ubuntu-22.04
 
     steps:
-    - name: Checkout Source
+    - name: Checkout source
       uses: actions/checkout@v4
       with:
         fetch-depth: 1
 
-    - name: Install Dependencies
+    - name: Install dependencies
       run: |
         sudo apt update
         sudo apt install -y build-essential git curl wget bison flex zip bc cpio libssl-dev ccache python-is-python3 tar
 
-    - name: Setup ZyC Clang Toolchain
+    # 生成短哈希（修复 substr() 报错）
+    - name: Set short commit SHA
+      id: vars
+      run: echo "SHORT_SHA=$(echo ${GITHUB_SHA} | cut -c1-8)" >> $GITHUB_ENV
+
+    - name: Cache ccache
+      uses: actions/cache@v4
+      with:
+        path: ~/.cache/ccache_mikernel
+        key: ${{ runner.os }}-ccache-${{ github.event.inputs.device }}-${{ github.event.inputs.include_ksu }}-${{ env.SHORT_SHA }}
+        restore-keys: |
+          ${{ runner.os }}-ccache-${{ github.event.inputs.device }}-${{ github.event.inputs.include_ksu }}-
+          ${{ runner.os }}-ccache-${{ github.event.inputs.device }}-
+          ${{ runner.os }}-ccache-
+
+    - name: Setup zyc-clang toolchain
       run: |
         mkdir -p $HOME/zyc-clang
         cd $HOME/zyc-clang
-        # Using the specific version from your Xiaomi example
         wget https://github.com/ZyCromerZ/Clang/releases/download/15.0.7-20251111-release/Clang-15.0.7-20251111.tar.gz
         tar -zxvf Clang-15.0.7-20251111.tar.gz
+        cd $GITHUB_WORKSPACE
 
-    - name: Build Kernel
-      env:
-        # Mimicking the bash script identity
-        KBUILD_BUILD_USER: "QcloudFx"
-        KBUILD_BUILD_HOST: "Abdul-Qadeer"
-        PATH: ${{ home }}/zyc-clang/bin:/usr/bin:/bin
+    - name: Build kernel
       run: |
-        # Variables from your .sh logic
-        export ARCH=arm64
-        export SUBARCH=ARM64
-        DEFCONFIG="vendor/arabella_defconfig"
+          bash build.sh
         
-        # 1. Clean
-        make O=out ARCH=arm64 clean
-        make O=out ARCH=arm64 mrproper
-        
-        # 2. Initialize Config
-        make O=out ARCH=arm64 $DEFCONFIG
-        
-        # 3. Compile (Mimicking the .sh exactly)
-        # We use the full LLVM=1 suite which ZyC Clang supports perfectly.
-        # This avoids the "libc.so.6" error by using the integrated LLVM tools.
-        make -j$(nproc) O=out \
-             ARCH=arm64 \
-             CC=clang \
-             NM=llvm-nm \
-             OBJCOPY=llvm-objcopy \
-             OBJDUMP=llvm-objdump \
-             STRIP=llvm-strip \
-             CROSS_COMPILE=aarch64-linux-gnu- \
-             CROSS_COMPILE_ARM32=arm-linux-gnueabi- \
-             LLVM=1 \
-             LLVM_IAS=1
+    - name: Show ccache stats
+      run: ccache -s
 
-    - name: Upload Everything Generated
+    - name: Upload build artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: Kernel-Output-LMV600
-        path: |
+        name: LMV600-Kernel-Output
+        path: | 
+         *.zip
           out/arch/arm64/boot/Image*
-          out/arch/arm64/boot/*.img
+          out/arch/arm64/boot/dtb*
           out/arch/arm64/boot/dts/vendor/*.dtb
           
