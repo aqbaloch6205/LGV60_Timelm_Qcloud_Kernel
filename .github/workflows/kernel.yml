@@ -1,0 +1,61 @@
+name: LG SM8250 Kernel Build
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Install Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y bc bison build-essential flex git libssl-dev \
+          libncurses5-dev zip python3 gcc-aarch64-linux-gnu gcc-arm-linux-gnueabi
+
+      - name: Fetch Toolchain
+        run: |
+          git clone --depth=1 https://github.com/kdrag0n/proton-clang.git toolchain
+
+      - name: Build Kernel
+        env:
+          KBUILD_BUILD_USER: "QCloudfx"
+          KBUILD_BUILD_HOST: "Abdul-Qadeer"
+          PATH: ${{ github.workspace }}/toolchain/bin:/usr/bin:/bin
+        run: |
+          # Exactly as the .sh script:
+          export ARCH=arm64
+          export SUBARCH=ARM64
+          DEFCONFIG="vendor/arabella_defconfig"
+          
+          # 1. Clean (mimicking 'make clean mrproper')
+          make O=out ARCH=arm64 clean
+          make O=out ARCH=arm64 mrproper
+          
+          # 2. Set Config
+          make O=out ARCH=arm64 $DEFCONFIG
+          
+          # 3. Compile (The exact command from his .sh)
+          # No 'dtbs' or 'Image.gz-dtb' added here. 
+          # It builds whatever the Makefile default is.
+          make -j$(nproc) O=out \
+               CC=clang \
+               CROSS_COMPILE=aarch64-linux-gnu- \
+               LLVM=1 \
+               LLVM_IAS=1
+
+      - name: Check and Upload Output
+        run: |
+          # This step identifies what the Makefile actually produced
+          ls -R out/arch/arm64/boot/
+          
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: Kernel-Output
+          path: out/arch/arm64/boot/
