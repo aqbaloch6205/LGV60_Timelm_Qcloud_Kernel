@@ -10,7 +10,7 @@ export SUBARCH=arm64
 export PATH="$TOOLCHAIN_PATH:$PATH"
 
 GIT_COMMIT_ID=$(git rev-parse --short=8 HEAD)
-DEFCONFIG="vendor/arabella_defconfig"
+DEFCONFIG="vendor/JhatPat_defconfig"
 OUT_DIR="out"
 
 # Verify toolchain
