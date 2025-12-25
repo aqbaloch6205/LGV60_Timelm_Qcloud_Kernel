@@ -50,7 +50,7 @@ if [ -f "$OUT_DIR/arch/arm64/boot/Image" ]; then
 
     # Create Flashable Zip
     cd anykernel
-    ZIP_NAME="Bhazheng-Kernel-Arabella-$(date +%Y%m%d)-${GIT_COMMIT_ID}.zip"
+    ZIP_NAME="Qcloudfx-Kernel-JhatPat-$(date +%Y%m%d)-${GIT_COMMIT_ID}.zip"
     zip -r9 "../$ZIP_NAME" ./* -x .git .gitignore out/
     cd ..
     
