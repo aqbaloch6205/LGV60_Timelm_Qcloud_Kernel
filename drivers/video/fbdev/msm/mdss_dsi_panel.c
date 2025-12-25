@@ -1757,7 +1757,7 @@ static void mdss_panel_parse_te_params(struct device_node *np,
 		(np, "qcom,mdss-tear-check-sync-threshold-continue", &tmp);
 	te->sync_threshold_continue = (!rc ? tmp : 4);
 	rc = of_property_read_u32(np, "qcom,mdss-tear-check-frame-rate", &tmp);
-	te->refx100 = (!rc ? tmp : 6000);
+	te->refx100 = (!rc ? tmp : 7000);
 	rc = of_property_read_u32
 		(np, "qcom,mdss-tear-check-start-pos", &tmp);
 	te->start_pos = (!rc ? tmp : timing->yres);
