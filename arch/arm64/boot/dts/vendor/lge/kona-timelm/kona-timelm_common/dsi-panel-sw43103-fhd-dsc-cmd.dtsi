@@ -1,3 +1,4 @@
+
 /* Copyright (c) 2014, Code Aurora Forum. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
@@ -205,11 +206,9 @@
 
 		qcom,mdss-dsi-display-timings {
 			timing@0{
-				qcom,partial-update-enabled = "single_roi";
-				qcom,panel-roi-alignment = <1080 60 1080 60 1080 60>;
 				qcom,mdss-dsi-panel-phy-timings = [00 11 04 04 1E 1E 04 04 02 02 04 00 12 14];
 				qcom,mdss-dsi-panel-clockrate = <560000000>;
-				qcom,display-topology = <2 2 1>;
+				qcom,display-topology = <1 1 1>;
 				qcom,default-topology-index = <0>;
 				qcom,mdss-dsi-panel-framerate = <70>;
 				qcom,mdss-dsi-panel-width = <1080>;
