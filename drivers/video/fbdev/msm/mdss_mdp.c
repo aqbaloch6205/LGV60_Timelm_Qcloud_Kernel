@@ -4971,7 +4971,7 @@ static void apply_dynamic_ot_limit(u32 *ot_lim,
 	case MDSS_MDP_HW_REV_330:
 		if ((res <= RES_1080p) && (params->frame_rate <= 30))
 			*ot_lim = 2;
-		else if ((res <= RES_1080p) && (params->frame_rate <= 60))
+		else if ((res <= RES_1080p) && (params->frame_rate <= 72))
 			*ot_lim = 6;
 		else if ((res <= RES_UHD) && (params->frame_rate <= 30))
 			*ot_lim = 16;
