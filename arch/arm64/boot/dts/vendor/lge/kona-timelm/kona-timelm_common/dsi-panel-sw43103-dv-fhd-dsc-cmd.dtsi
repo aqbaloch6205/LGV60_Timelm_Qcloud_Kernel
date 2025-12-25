@@ -430,6 +430,7 @@
 				qcom,mdss-dsi-v-top-border = <0>;
 				qcom,mdss-dsi-v-bottom-border = <0>;
 				qcom,mdss-dsi-h-sync-pulse = <0>;
+                qcom,mdss-tear-check-frame-rate = <7000>;
 				qcom,mdss-mdp-transfer-time-us = <12500>;
 
 				qcom,mdss-dsi-on-command = [
@@ -539,6 +540,7 @@
 				qcom,mdss-dsi-v-bottom-border = <0>;
 				qcom,mdss-dsi-h-sync-pulse = <0>;
 				qcom,mdss-mdp-transfer-time-us = <12500>;
+                qcom,mdss-tear-check-frame-rate = <7000>;
 				lge,mdss-dsi-panel-framerate-div = <2>;
 
 				qcom,mdss-dsi-on-command = [
