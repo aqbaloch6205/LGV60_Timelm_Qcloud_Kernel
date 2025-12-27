@@ -10,7 +10,7 @@ export SUBARCH=arm64
 export PATH="$TOOLCHAIN_PATH:$PATH"
 
 GIT_COMMIT_ID=$(git rev-parse --short=8 HEAD)
-DEFCONFIG="vendor/arabella_defconfig"
+DEFCONFIG="vendor/JhatPat_defconfig"
 OUT_DIR="out"
 
 # Verify toolchain
@@ -25,7 +25,7 @@ rm -rf $OUT_DIR anykernel/ *.zip
 echo "Cloning AnyKernel3..."
 git clone https://github.com/liyafe1997/AnyKernel3 -b kona --single-branch --depth=1 anykernel
 
-echo "Starting Build for Arabella..."
+echo "Starting Build for Jhat-Pat..."
 # Use LLVM=1 to ensure the integrated linker/assembler is used
 MAKE_ARGS="O=$OUT_DIR ARCH=arm64 CC=clang CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabi- LLVM=1 LLVM_IAS=1"
 
@@ -50,7 +50,7 @@ if [ -f "$OUT_DIR/arch/arm64/boot/Image" ]; then
 
     # Create Flashable Zip
     cd anykernel
-    ZIP_NAME="Bhazheng-Kernel-Arabella-$(date +%Y%m%d)-${GIT_COMMIT_ID}.zip"
+    ZIP_NAME="Jhat-Pat-Kernel-Qcloudfx-$(date +%Y%m%d)-${GIT_COMMIT_ID}.zip"
     zip -r9 "../$ZIP_NAME" ./* -x .git .gitignore out/
     cd ..
     
