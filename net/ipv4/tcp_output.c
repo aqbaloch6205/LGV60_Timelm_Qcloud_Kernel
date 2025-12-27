@@ -53,10 +53,6 @@
 
 #include <trace/events/tcp.h>
 
-<<<<<<< HEAD
-#ifdef CONFIG_LGP_DATA_TCPIP_MPTCP
-#else
-=======
 /* Refresh clocks of a TCP socket,
  * ensuring monotically increasing values.
  */
@@ -73,7 +69,9 @@ void tcp_mstamp_refresh(struct tcp_sock *tp)
 		tp->tcp_mstamp = val;
 }
 
->>>>>>> a155c4e07846 (UPSTREAM: tcp: add tcp_wstamp_ns socket field)
+
+#ifdef CONFIG_LGP_DATA_TCPIP_MPTCP
+#else
 static bool tcp_write_xmit(struct sock *sk, unsigned int mss_now, int nonagle,
 			   int push_one, gfp_t gfp);
 
