@@ -6446,11 +6446,12 @@ void cgroup_sk_clone(struct sock_cgroup_data *skcd)
 		if (skcd->no_refcnt)
 			return;
 		/*
-		 * We might be cloning a socket which is left in an empty
+		 * we might be cloning a socket which is left in an empty
 		 * cgroup and the cgroup might have already been rmdir'd.
 		 * Don't use cgroup_get_live().
 		 */
 		cgroup_get(sock_cgroup_ptr(skcd));
+		cgroup_bpf_get(sock_cgroup_ptr(skcd));
 	}
 }
 
