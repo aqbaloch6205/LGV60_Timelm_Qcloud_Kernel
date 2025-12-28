@@ -56,9 +56,9 @@ jobs:
         export PATH="$HOME/zyc-clang/bin:$PATH"
         if [ "${{ github.event.inputs.include_ksu }}" = "true" ]; then
           # Ensure your build.sh is set up to handle the 'ksu' argument
-          bash build.sh ksu
+          bash kernel.sh ksu
         else
-          bash build.sh
+          bash kernel.sh
         fi
 
     - name: Show ccache stats
