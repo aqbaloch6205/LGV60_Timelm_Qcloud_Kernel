@@ -44,11 +44,7 @@
 #define avc_cache_stats_incr(field)	do {} while (0)
 #endif
 
-#ifdef CONFIG_KSU_SUSFS
-extern u32 susfs_ksu_sid;
-extern u32 susfs_kernel_sid;
-bool susfs_is_avc_log_spoofing_enabled = false;
-#endif
+
 
 
 struct avc_entry {
