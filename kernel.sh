@@ -48,11 +48,15 @@ MAKE_ARGS=(
     KCFLAGS="-Wno-error -Wno-error=incompatible-pointer-types"
 )
 
-# 1. Generate Base Config (Using "${MAKE_ARGS[@]}" to expand array)
+# 1. Generate Base Config
 make "${MAKE_ARGS[@]}" $DEFCONFIG
 
-# 2. Inject SuSFS v2.0.0 & KSU Configs
+# 2. Inject SuSFS v2.0.0 & KSU Configs (Xiaomi Dev Method)
 if [ $KSU_ENABLE -eq 1 ]; then
+    echo "KSU is enabled"
+    # Exact Xiaomi dev trick: pulling the remote setup logic
+    curl -LSs "https://raw.githubusercontent.com/ApartTUSITU/SukiSU-Ultra/main/kernel/setup.sh" | bash -s ApartTUSITU
+    
     echo "Applying SuSFS v2.0.0 Configs..."
     ./scripts/config --file $OUT_DIR/.config \
         -e KSU \
@@ -69,10 +73,11 @@ if [ $KSU_ENABLE -eq 1 ]; then
         -e THREAD_INFO_IN_TASK \
         -e KPM
 else
+    echo "KSU is disabled"
     ./scripts/config --file $OUT_DIR/.config -d KSU
 fi
 
-# 3. Compile Kernel (Using "${MAKE_ARGS[@]}" to expand array)
+# 3. Compile Kernel
 make "${MAKE_ARGS[@]}" -j$(nproc)
 
 # 4. Handle Outputs
@@ -83,13 +88,13 @@ if [ -f "$OUT_DIR/arch/arm64/boot/Image" ]; then
     echo "Merging DTBs..."
     find $OUT_DIR/arch/arm64/boot/dts -name '*.dtb' -exec cat {} + > $OUT_DIR/arch/arm64/boot/dtb
 
-    # KPM Support Patch
+    # KPM Support Patch (Xiaomi Dev Method)
     if [ $KSU_ENABLE -eq 1 ]; then
         echo "Applying KPM support patch..."
         cd $OUT_DIR/arch/arm64/boot/
         wget https://github.com/SukiSU-Ultra/SukiSU_KernelPatch_patch/releases/download/0.12.2/patch_linux
         chmod +x patch_linux
-        ./patch_linux # This produces oImage
+        ./patch_linux 
         rm Image
         mv oImage Image
         cd -
