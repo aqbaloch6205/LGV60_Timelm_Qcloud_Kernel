@@ -1216,10 +1216,6 @@ skip_checking_for_ksu_proc:
 bypass_orig_flow:
 #endif
 
-	mnt = alloc_vfsmnt(old->mnt_devname);
-#ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
-bypass_orig_flow:
-#endif
 
 	if (!mnt)
 		return ERR_PTR(-ENOMEM);
