@@ -14,7 +14,7 @@ DEFCONFIG="vendor/JhatPat_defconfig"
 OUT_DIR="out"
 ANYKERNEL_DIR="anykernel"
 
-# Determine if KSU is enabled (matches your Workflow dispatch)
+# Determine if KSU is enabled
 KSU_ENABLE=0
 KSU_ZIP_STR="NoKSU"
 if [ "$1" == "ksu" ]; then
@@ -35,11 +35,21 @@ echo "Cloning AnyKernel3..."
 git clone https://github.com/liyafe1997/AnyKernel3 -b kona --single-branch --depth=1 $ANYKERNEL_DIR
 
 echo "Starting Build for Jhat-Pat (KSU=$KSU_ENABLE)..."
-MAKE_ARGS="O=$OUT_DIR ARCH=arm64 CC=clang CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabi- LLVM=1 LLVM_IAS=1 KCFLAGS='-Wno-error -Wno-error=incompatible-pointer-types'"
 
+# --- FIXED SECTION: Using Array to handle quotes correctly ---
+MAKE_ARGS=(
+    O="$OUT_DIR"
+    ARCH=arm64
+    CC=clang
+    CROSS_COMPILE=aarch64-linux-gnu-
+    CROSS_COMPILE_ARM32=arm-linux-gnueabi-
+    LLVM=1
+    LLVM_IAS=1
+    KCFLAGS="-Wno-error -Wno-error=incompatible-pointer-types"
+)
 
-# 1. Generate Base Config
-make $MAKE_ARGS $DEFCONFIG
+# 1. Generate Base Config (Using "${MAKE_ARGS[@]}" to expand array)
+make "${MAKE_ARGS[@]}" $DEFCONFIG
 
 # 2. Inject SuSFS v2.0.0 & KSU Configs
 if [ $KSU_ENABLE -eq 1 ]; then
@@ -62,8 +72,8 @@ else
     ./scripts/config --file $OUT_DIR/.config -d KSU
 fi
 
-# 3. Compile Kernel
-make $MAKE_ARGS -j$(nproc)
+# 3. Compile Kernel (Using "${MAKE_ARGS[@]}" to expand array)
+make "${MAKE_ARGS[@]}" -j$(nproc)
 
 # 4. Handle Outputs
 if [ -f "$OUT_DIR/arch/arm64/boot/Image" ]; then
@@ -73,7 +83,7 @@ if [ -f "$OUT_DIR/arch/arm64/boot/Image" ]; then
     echo "Merging DTBs..."
     find $OUT_DIR/arch/arm64/boot/dts -name '*.dtb' -exec cat {} + > $OUT_DIR/arch/arm64/boot/dtb
 
-    # KPM Support Patch (As per SukiSU Ultra logic)
+    # KPM Support Patch
     if [ $KSU_ENABLE -eq 1 ]; then
         echo "Applying KPM support patch..."
         cd $OUT_DIR/arch/arm64/boot/
