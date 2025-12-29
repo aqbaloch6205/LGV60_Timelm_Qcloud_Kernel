@@ -35,8 +35,7 @@ echo "Cloning AnyKernel3..."
 git clone https://github.com/liyafe1997/AnyKernel3 -b kona --single-branch --depth=1 $ANYKERNEL_DIR
 
 echo "Starting Build for Jhat-Pat (KSU=$KSU_ENABLE)..."
-MAKE_ARGS="O=$OUT_DIR ARCH=arm64 CC=clang CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabi- LLVM=1 LLVM_IAS=1 KCFLAGS='-Wno-error -Wno-error=incompatible-pointer-types'"
-
+MAKE_ARGS="O=$OUT_DIR ARCH=arm64 CC=clang CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabi- LLVM=1 LLVM_IAS=1"
 
 # 1. Generate Base Config
 make $MAKE_ARGS $DEFCONFIG
