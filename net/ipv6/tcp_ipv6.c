@@ -70,6 +70,7 @@
 #include <linux/scatterlist.h>
 
 #include <trace/events/tcp.h>
+
 static void	tcp_v6_send_reset(const struct sock *sk, struct sk_buff *skb);
 static void	tcp_v6_reqsk_send_ack(const struct sock *sk, struct sk_buff *skb,
 				      struct request_sock *req);
@@ -78,7 +79,6 @@ static int	tcp_v6_do_rcv(struct sock *sk, struct sk_buff *skb);
 
 static const struct inet_connection_sock_af_ops ipv6_mapped;
 static const struct inet_connection_sock_af_ops ipv6_specific;
-
 #ifdef CONFIG_TCP_MD5SIG
 static const struct tcp_sock_af_ops tcp_sock_ipv6_specific;
 static const struct tcp_sock_af_ops tcp_sock_ipv6_mapped_specific;
@@ -91,7 +91,6 @@ static struct tcp_md5sig_key *tcp_v6_md5_do_lookup(const struct sock *sk,
 #endif
 
 static void inet6_sk_rx_dst_set(struct sock *sk, const struct sk_buff *skb)
-
 {
 	struct dst_entry *dst = skb_dst(skb);
 
@@ -135,7 +134,6 @@ static int tcp_v6_pre_connect(struct sock *sk, struct sockaddr *uaddr,
 
 static int tcp_v6_connect(struct sock *sk, struct sockaddr *uaddr,
 			  int addr_len)
-			  
 {
 	struct sockaddr_in6 *usin = (struct sockaddr_in6 *) uaddr;
 	struct inet_sock *inet = inet_sk(sk);
@@ -238,7 +236,6 @@ static int tcp_v6_connect(struct sock *sk, struct sockaddr *uaddr,
 		tp->af_specific = &tcp_sock_ipv6_mapped_specific;
 #endif
 
-
 		err = tcp_v4_connect(sk, (struct sockaddr *)&sin, sizeof(sin));
 
 		if (err) {
@@ -249,7 +246,6 @@ static int tcp_v6_connect(struct sock *sk, struct sockaddr *uaddr,
 #ifdef CONFIG_TCP_MD5SIG
 			tp->af_specific = &tcp_sock_ipv6_specific;
 #endif
-
 			goto failure;
 		}
 		np->saddr = sk->sk_v6_rcv_saddr;
@@ -343,7 +339,6 @@ failure:
 }
 
 static void tcp_v6_mtu_reduced(struct sock *sk)
-
 {
 	struct dst_entry *dst;
 	u32 mtu;
@@ -405,7 +400,6 @@ static void tcp_v6_err(struct sk_buff *skb, struct inet6_skb_parm *opt,
 
 	bh_lock_sock(sk);
 	if (sock_owned_by_user(sk) && type != ICMPV6_PKT_TOOBIG)
-	
 		__NET_INC_STATS(net, LINUX_MIB_LOCKDROPPEDICMPS);
 
 	if (sk->sk_state == TCP_CLOSE)
@@ -417,7 +411,6 @@ static void tcp_v6_err(struct sk_buff *skb, struct inet6_skb_parm *opt,
 	}
 
 	tp = tcp_sk(sk);
-	
 	/* XXX (TFO) - tp->snd_una should be ISN (tcp_create_openreq_child() */
 	fastopen = rcu_dereference(tp->fastopen_rsk);
 	snd_una = fastopen ? tcp_rsk(fastopen)->snt_isn : tp->snd_una;
@@ -462,7 +455,6 @@ static void tcp_v6_err(struct sk_buff *skb, struct inet6_skb_parm *opt,
 		else if (!test_and_set_bit(TCP_MTU_REDUCED_DEFERRED,
 					   &sk->sk_tsq_flags))
 			sock_hold(sk);
-			
 		goto out;
 	}
 
@@ -478,7 +470,6 @@ static void tcp_v6_err(struct sk_buff *skb, struct inet6_skb_parm *opt,
 			break;
 
 		if (!sock_owned_by_user(sk)) {
-		
 			sk->sk_err = err;
 			sk->sk_error_report(sk);		/* Wake people up to see the error (see connect in sock.c) */
 
@@ -489,7 +480,6 @@ static void tcp_v6_err(struct sk_buff *skb, struct inet6_skb_parm *opt,
 	}
 
 	if (!sock_owned_by_user(sk) && np->recverr) {
-	
 		sk->sk_err = err;
 		sk->sk_error_report(sk);
 	} else
@@ -497,7 +487,6 @@ static void tcp_v6_err(struct sk_buff *skb, struct inet6_skb_parm *opt,
 
 out:
 	bh_unlock_sock(sk);
-	
 	sock_put(sk);
 }
 
@@ -545,8 +534,8 @@ done:
 	return err;
 }
 
-static void tcp_v6_reqsk_destructor(struct request_sock *req)
 
+static void tcp_v6_reqsk_destructor(struct request_sock *req)
 {
 	kfree(inet_rsk(req)->ipv6_opt);
 	kfree_skb(inet_rsk(req)->pktopts);
@@ -767,7 +756,6 @@ static bool tcp_v6_inbound_md5_hash(const struct sock *sk,
 static void tcp_v6_init_req(struct request_sock *req,
 			    const struct sock *sk_listener,
 			    struct sk_buff *skb)
-			    
 {
 	struct inet_request_sock *ireq = inet_rsk(req);
 	const struct ipv6_pinfo *np = inet6_sk(sk_listener);
@@ -788,7 +776,6 @@ static void tcp_v6_init_req(struct request_sock *req,
 		refcount_inc(&skb->users);
 		ireq->pktopts = skb;
 	}
-
 }
 
 static struct dst_entry *tcp_v6_route_req(const struct sock *sk,
@@ -829,7 +816,6 @@ static void tcp_v6_send_response(const struct sock *sk, struct sk_buff *skb, u32
 				 u32 ack, u32 win, u32 tsval, u32 tsecr,
 				 int oif, struct tcp_md5sig_key *key, int rst,
 				 u8 tclass, __be32 label)
-				 
 {
 	const struct tcphdr *th = tcp_hdr(skb);
 	struct tcphdr *t1;
@@ -848,7 +834,6 @@ static void tcp_v6_send_response(const struct sock *sk, struct sk_buff *skb, u32
 	if (key)
 		tot_len += TCPOLEN_MD5SIG_ALIGNED;
 #endif
-
 
 	buff = alloc_skb(MAX_HEADER + sizeof(struct ipv6hdr) + tot_len,
 			 GFP_ATOMIC);
@@ -937,7 +922,6 @@ static void tcp_v6_send_response(const struct sock *sk, struct sk_buff *skb, u32
 }
 
 static void tcp_v6_send_reset(const struct sock *sk, struct sk_buff *skb)
-
 {
 	const struct tcphdr *th = tcp_hdr(skb);
 	u32 seq = 0, ack_seq = 0;
@@ -1006,7 +990,6 @@ static void tcp_v6_send_reset(const struct sock *sk, struct sk_buff *skb)
 	}
 
 	tcp_v6_send_response(sk, skb, seq, ack_seq, 0, 0, 0, oif, key, 1, 0, 0);
-	
 
 #ifdef CONFIG_TCP_MD5SIG
 out:
@@ -1023,7 +1006,6 @@ static void tcp_v6_send_ack(const struct sock *sk, struct sk_buff *skb, u32 seq,
 			     tclass, label);
 }
 
-
 static void tcp_v6_timewait_ack(struct sock *sk, struct sk_buff *skb)
 {
 	struct inet_timewait_sock *tw = inet_twsk(sk);
@@ -1037,7 +1019,6 @@ static void tcp_v6_timewait_ack(struct sock *sk, struct sk_buff *skb)
 
 	inet_twsk_put(tw);
 }
-
 
 static void tcp_v6_reqsk_send_ack(const struct sock *sk, struct sk_buff *skb,
 				  struct request_sock *req)
@@ -1088,8 +1069,6 @@ u16 tcp_v6_get_syncookie(struct sock *sk, struct ipv6hdr *iph,
 }
 
 static int tcp_v6_conn_request(struct sock *sk, struct sk_buff *skb)
-
-
 {
 	if (skb->protocol == htons(ETH_P_IP))
 		return tcp_v4_conn_request(sk, skb);
@@ -1125,7 +1104,6 @@ static struct sock *tcp_v6_syn_recv_sock(const struct sock *sk, struct sk_buff *
 					 struct dst_entry *dst,
 					 struct request_sock *req_unhash,
 					 bool *own_req)
-					 
 {
 	struct inet_request_sock *ireq;
 	struct ipv6_pinfo *newnp;
@@ -1347,7 +1325,6 @@ out:
  * held.
  */
 static int tcp_v6_do_rcv(struct sock *sk, struct sk_buff *skb)
-
 {
 	struct ipv6_pinfo *np = inet6_sk(sk);
 	struct tcp_sock *tp;
@@ -1363,7 +1340,6 @@ static int tcp_v6_do_rcv(struct sock *sk, struct sk_buff *skb)
 
 	if (skb->protocol == htons(ETH_P_IP))
 		return tcp_v4_do_rcv(sk, skb);
-
 
 	/*
 	 *	socket locking is here for SMP purposes as backlog rcv
@@ -1494,7 +1470,6 @@ static void tcp_v6_fill_cb(struct sk_buff *skb, const struct ipv6hdr *hdr,
 	TCP_SKB_CB(skb)->end_seq = (TCP_SKB_CB(skb)->seq + th->syn + th->fin +
 				    skb->len - th->doff*4);
 	TCP_SKB_CB(skb)->ack_seq = ntohl(th->ack_seq);
-
 	TCP_SKB_CB(skb)->tcp_flags = tcp_flag_byte(th);
 	TCP_SKB_CB(skb)->tcp_tw_isn = 0;
 	TCP_SKB_CB(skb)->ip_dsfield = ipv6_get_dsfield(hdr);
@@ -1564,7 +1539,6 @@ process:
 			goto csum_error;
 		}
 		if (unlikely(sk->sk_state != TCP_LISTEN)) {
-		
 			inet_csk_reqsk_queue_drop_and_put(sk, req);
 			goto lookup;
 		}
@@ -1638,7 +1612,6 @@ process:
 	}
 	bh_unlock_sock(sk);
 
-
 put_and_return:
 	if (refcounted)
 		sock_put(sk);
@@ -1649,7 +1622,6 @@ no_tcp_socket:
 		goto discard_it;
 
 	tcp_v6_fill_cb(skb, hdr, th);
-
 
 	if (tcp_checksum_complete(skb)) {
 csum_error:
@@ -1703,6 +1675,7 @@ do_time_wait:
 			refcounted = false;
 			goto process;
 		}
+	}
 		/* to ACK */
 		/* fall through */
 	case TCP_TW_ACK:
@@ -1755,16 +1728,14 @@ static void tcp_v6_early_demux(struct sk_buff *skb)
 		}
 	}
 }
+
 static struct timewait_sock_ops tcp6_timewait_sock_ops = {
-
-
 	.twsk_obj_size	= sizeof(struct tcp6_timewait_sock),
 	.twsk_unique	= tcp_twsk_unique,
 	.twsk_destructor = tcp_twsk_destructor,
 };
 
 static const struct inet_connection_sock_af_ops ipv6_specific = {
-
 	.queue_xmit	   = inet6_csk_xmit,
 	.send_check	   = tcp_v6_send_check,
 	.rebuild_header	   = inet6_sk_rebuild_header,
@@ -1838,12 +1809,6 @@ static int tcp_v6_init_sock(struct sock *sk)
 #endif
 
 	return 0;
-}
-
-static void tcp_v6_destroy_sock(struct sock *sk)
-{
-	tcp_v4_destroy_sock(sk);
-	inet6_destroy_sock(sk);
 }
 
 #ifdef CONFIG_PROC_FS
@@ -2077,7 +2042,6 @@ struct proto tcpv6_prot = {
 	.compat_getsockopt	= compat_tcp_getsockopt,
 #endif
 	.diag_destroy		= tcp_abort,
-
 };
 
 /* thinking of making this const? Don't.
