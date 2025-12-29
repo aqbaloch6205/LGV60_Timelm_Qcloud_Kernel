@@ -426,7 +426,7 @@ struct tcp_sock {
 	 * socket. Used to retransmit SYNACKs etc.
 	 */
 	struct request_sock __rcu *fastopen_rsk;
-	struct tcp_saved_syn *saved_syn;
+	struct saved_syn *saved_syn;
 };
 
 
