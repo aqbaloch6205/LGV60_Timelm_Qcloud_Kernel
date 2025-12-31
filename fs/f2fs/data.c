@@ -1290,7 +1290,7 @@ struct page *f2fs_find_data_page(struct inode *inode, pgoff_t index)
 	struct address_space *mapping = inode->i_mapping;
 	struct page *page;
 
-	page = find_get_page(mapping, index);
+	page = find_get_page_flags(mapping, index, FGP_ACCESSED);
 	if (page && PageUptodate(page))
 		return page;
 	f2fs_put_page(page, 0);
@@ -1542,7 +1542,6 @@ int f2fs_map_blocks(struct inode *inode, struct f2fs_map_blocks *map,
 		if (map->m_next_extent)
 			*map->m_next_extent = pgofs + map->m_len;
 
-		/* for hardware encryption, but to avoid potential issue in future */
 		if (flag == F2FS_GET_BLOCK_DIO)
 			f2fs_wait_on_block_writeback_range(inode,
 						map->m_pblk, map->m_len);
