@@ -32,7 +32,7 @@ echo "Cleaning old builds..."
 rm -rf $OUT_DIR $ANYKERNEL_DIR *.zip
 
 echo "Cloning AnyKernel3..."
-git clone https://github.com/liyafe1997/AnyKernel3 -b kona --single-branch --depth=1 $ANYKERNEL_DIR
+git clone https://github.com/aqbaloch6205/AnyKernel3 -b kona --single-branch --depth=1 $ANYKERNEL_DIR
 
 echo "Starting Build for Jhat-Pat (KSU=$KSU_ENABLE)..."
 

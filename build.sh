@@ -23,7 +23,7 @@ echo "Cleaning old builds..."
 rm -rf $OUT_DIR anykernel/ *.zip
 
 echo "Cloning AnyKernel3..."
-git clone https://github.com/liyafe1997/AnyKernel3 -b kona --single-branch --depth=1 anykernel
+git clone https://github.com/aqbaloch6205/AnyKernel3 -b kona --single-branch --depth=1 anykernel
 
 echo "Starting Build for Jhat-Pat..."
 # Use LLVM=1 to ensure the integrated linker/assembler is used
