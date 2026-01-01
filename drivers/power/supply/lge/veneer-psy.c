@@ -323,9 +323,11 @@ static void update_veneer_supplier(struct veneer* veneer_me)
 				break;
 				// fall through, (Here is no break)
 			case POWER_SUPPLY_TYPE_USB_DCP :
-				// USB C type would be enumerated to DCP type
-				new = supplier_typec(psy, &val);
-				break;
+    /* FORCE TURBO: Skip standard detection and trigger QC3 protocol */
+                new = CHARGING_SUPPLY_DCP_QC3; 
+                pr_veneer("Xiaomi Turbo Emulation: Forced QC3 on DCP\n");
+                break;
+
 
 			case POWER_SUPPLY_TYPE_USB :
 				new = supplier_sdp(psy, &val);

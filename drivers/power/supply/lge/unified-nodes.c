@@ -260,8 +260,8 @@ static bool unified_nodes_actm_dt(
 			actm_array[1] = 0;
 			actm_array[2] = 0;
 		}
-		uninodes->actm.current_wired[0] = 4500;
-		uninodes->actm.current_wired[1] = 4000;
+		uninodes->actm.current_wired[0] = 4800;
+		uninodes->actm.current_wired[1] = 4500;
 		uninodes->actm.current_wired[2] = actm_array[2];
 
 		ret = of_property_read_u32_array(devnode_actm,
@@ -271,8 +271,8 @@ static bool unified_nodes_actm_dt(
 			actm_array[0] = 0;
 			actm_array[1] = 0;
 		}
-		uninodes->actm.current_cp[0] = 4500;
-        uninodes->actm.current_cp[1] = 4000;
+		uninodes->actm.current_cp[0] = 4800;
+        uninodes->actm.current_cp[1] = 4500;
 
 
 		ret = of_property_read_u32_array(devnode_actm,
@@ -283,8 +283,8 @@ static bool unified_nodes_actm_dt(
 			actm_array[1] = 0;
 			actm_array[2] = 0;
 		}
-		uninodes->actm.wired_max_fcc[0] = 4500; 
-		uninodes->actm.wired_max_fcc[1] = 4000; 
+		uninodes->actm.wired_max_fcc[0] = 4800; 
+		uninodes->actm.wired_max_fcc[1] = 4500; 
 		uninodes->actm.wired_max_fcc[2] = actm_array[2];
 
 		ret = of_property_read_u32(devnode_actm,
