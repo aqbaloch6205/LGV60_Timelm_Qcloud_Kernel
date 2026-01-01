@@ -702,12 +702,12 @@ static int psy_property_get(
 	}
 	battery = get_psy_battery(veneer_me);
 
-	switch (prop) {
+		switch (prop) {
 		case POWER_SUPPLY_PROP_CHARGE_FULL_DESIGN:
-	case POWER_SUPPLY_PROP_CHARGE_FULL:
-	case POWER_SUPPLY_PROP_CAPACITY_DESIGN:
-		val->intval = 5000000; // 5000mAh for LG V60
-		return 0;
+		case POWER_SUPPLY_PROP_CHARGE_FULL:
+			val->intval = 5000000; // 5000mAh for LG V60
+			return 0;
+
 	case POWER_SUPPLY_PROP_TIME_TO_FULL_NOW :
 		rc = -EINVAL;
 
