@@ -277,7 +277,7 @@ static bool charging_wakelock_release(struct veneer* veneer_me)
 	if (veneer_me && veneer_me->veneer_wakelock->active) {
 		pr_veneer("%s\n", VENEER_WAKELOCK);
 		__pm_relax(veneer_me->veneer_wakelock);
-		pm_wakeup_event(veneer_me->veneer_dev, 1000);
+		pm_wakeup_event(veneer_me->veneer_dev, 0);
 		remove_pm_qos_request(veneer_me);
 		return true;
 	}
@@ -286,14 +286,24 @@ static bool charging_wakelock_release(struct veneer* veneer_me)
 
 static void update_veneer_wakelock(struct veneer* veneer_me)
 {
-	bool connected = supplier_connected(veneer_me);
-	bool eoc = veneer_me->battery_eoc;
+    bool connected = supplier_connected(veneer_me); // Checks for USB or Wireless
+    bool eoc = veneer_me->battery_eoc; // End of Charge
 
-	if (connected && !eoc)
-		charging_wakelock_acquire(veneer_me);
-	else
-		charging_wakelock_release(veneer_me);
+    /* * Force release if not connected or if battery is full (eoc).
+     * If HyperOS is hanging, we force an extra relax here.
+     */
+    if (connected && !eoc) {
+        charging_wakelock_acquire(veneer_me);
+    } else {
+        charging_wakelock_release(veneer_me);
+        
+        // Safety: ensure the kernel objects are truly relaxed
+        if (veneer_me->veneer_wakelock && veneer_me->veneer_wakelock->active) {
+             __pm_relax(veneer_me->veneer_wakelock);
+        }
+    }
 }
+
 
 static void update_veneer_supplier(struct veneer* veneer_me)
 {
@@ -693,6 +703,11 @@ static int psy_property_get(
 	battery = get_psy_battery(veneer_me);
 
 	switch (prop) {
+		case POWER_SUPPLY_PROP_CHARGE_FULL_DESIGN:
+	case POWER_SUPPLY_PROP_CHARGE_FULL:
+	case POWER_SUPPLY_PROP_CAPACITY_DESIGN:
+		val->intval = 5000000; // 5000mAh for LG V60
+		return 0;
 	case POWER_SUPPLY_PROP_TIME_TO_FULL_NOW :
 		rc = -EINVAL;
 
