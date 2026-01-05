@@ -1,21 +1,13 @@
 qcom,LGE_BLT46_Tocad_5000mAh {
-	/* MODIFIED FOR 10000mAh - Keeping original name to avoid editing other files */
+	/* #4332792_LGE_BLT46atl_5000mAh_averaged_MasterSlave_Jan6th2020*/
 	qcom,max-voltage-uv = <4450000>;
 	qcom,fg-cc-cv-threshold-mv = <4430>;
-
-	/* Changed to 10000mAh */
-	qcom,nom-batt-capacity-mah = <10000>;
-
-	/* Charging current - 4.8A is plenty for the V60 hardware */
+	qcom,nom-batt-capacity-mah = <5000>;
 	qcom,fastchg-current-ma = <4850>;
-
 	qcom,batt-id-kohm = <91>;
 	qcom,battery-beta = <4250>;
 	qcom,therm-room-temp = <100000>;
-	
-	/* Keep the internal string the same for the Fuel Gauge driver */
 	qcom,battery-type = "LGE_BLT46_Tocad_5000mAh";
-
 	qcom,therm-coefficients = <0x2318 0xd0c 0xdaf7 0xc556 0x848d>;
 	qcom,therm-center-offset = <0x70>;
 	qcom,therm-pull-up = <100>;
