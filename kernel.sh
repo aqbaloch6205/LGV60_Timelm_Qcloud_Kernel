@@ -71,11 +71,15 @@ if [ $KSU_ENABLE -eq 1 ]; then
         -e KSU_SUSFS_OPEN_REDIRECT \
         -e KSU_SUSFS_SUS_MAP \
         -e THREAD_INFO_IN_TASK \
-        -e KPM
+        -e KPM \
+        -e PERF_HELPER
 else
     echo "KSU is disabled"
-    ./scripts/config --file $OUT_DIR/.config -d KSU
+    ./scripts/config --file $OUT_DIR/.config \
+        -d KSU \
+        -e PERF_HELPER
 fi
+
 
 # 3. Compile Kernel
 make "${MAKE_ARGS[@]}" -j$(nproc)
