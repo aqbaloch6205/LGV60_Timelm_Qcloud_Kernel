@@ -527,16 +527,16 @@
 			lge,float   = < 500  500    0>;
 			lge,none    = <   0    0    0>;
 
-			lge,dcp     = <3000    0    0>;
+			lge,dcp     = <1500    0    0>;
 			lge,10k     = <3000    0    0>;
 			lge,22k     = <1500    0    0>;
-			lge,qc2     = <3000    0    0>;
-			lge,qc3     = <3000    0    0>;
+			lge,qc2     = <1800    0    0>;
+			lge,qc3     = <1800    0    0>;
 
 			lge,usb2    = < 500    0    0>;
 			lge,usb3    = < 900    0    0>;
 			lge,cdp     = <1500 1500    0>;
-			lge,pd      = <3000    0    0>;
+			lge,pd      = <   0    0    0>;
 
 			lge,56k     = <1500  500    0>;
 			lge,130k    = <1500  500    0>;
@@ -848,8 +848,8 @@
 
 			lge,charging-target-data = <
 	/* format : type, power(mW), current(mA), down(uA), target(min) */
-	/* cp pps  thermal  */    0    25000    4850       0    110
-	/*         balanced */  100    25000    4850       0    100
+	/* cp pps  thermal  */    0    25000    4000       0    110
+	/*         balanced */  100    25000    4000       0    100
 	/*         charging */  200    25000    4850       0     90
 	/* CP QC3  thermal  */    1    16200    3000       0    125
 	/*         balanced */  101    16200    3000       0    115
