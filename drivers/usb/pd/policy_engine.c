@@ -555,6 +555,7 @@ struct usbpd {
 	enum pd_spec_rev	peer_pd_rev;
 #endif
 	bool			no_usb3dp_concurrency;
+	bool			pd20_source_only;
 
 	u32			sink_caps[7];
 	int			num_sink_caps;
@@ -2783,8 +2784,17 @@ static int usbpd_startup_common(struct usbpd *pd,
 		 * support up to PD 3.0; if peer is 2.0
 		 * phy_msg_received() will handle the downgrade.
 		 */
-		pd->spec_rev = USBPD_REV_30;
-		
+#ifdef CONFIG_LGE_USB
+		if (disable_usb_pd_rev3 || pd->is_moisture_detected)
+			pd->spec_rev = USBPD_REV_20;
+		else
+#endif
+		if ((pd->pd20_source_only) &&
+			pd->current_state == PE_SRC_STARTUP)
+			pd->spec_rev = USBPD_REV_20;
+		else
+			pd->spec_rev = USBPD_REV_30;
+
 		if (pd->pd_phy_opened) {
 			pd_phy_close();
 			pd->pd_phy_opened = false;
@@ -2950,8 +2960,16 @@ static void handle_state_src_startup_wait_for_vdm_resp(struct usbpd *pd,
 	 * Emarker may have negotiated down to rev 2.0.
 	 * Reset to 3.0 to begin SOP communication with sink
 	 */
-	pd->spec_rev = USBPD_REV_30;
-	
+#ifdef CONFIG_LGE_USB
+	if (disable_usb_pd_rev3 || pd->is_moisture_detected)
+		pd->spec_rev = USBPD_REV_20;
+	else
+#endif
+	if (pd->pd20_source_only)
+		pd->spec_rev = USBPD_REV_20;
+	else
+		pd->spec_rev = USBPD_REV_30;
+
 	pd->current_state = PE_SRC_SEND_CAPABILITIES;
 	kick_sm(pd, ms);
 }
@@ -7041,6 +7059,36 @@ struct usbpd *usbpd_create(struct device *parent)
 				sizeof(default_snk_caps));
 		pd->num_sink_caps = ARRAY_SIZE(default_snk_caps);
 	}
+
+#ifdef CONFIG_DUAL_ROLE_USB_INTF
+#ifdef CONFIG_LGE_USB_MOISTURE_DETECTION_NO_UX
+        pd->is_moisture_ux = DUAL_ROLE_PROP_MOISTURE_UX_DISABLE;
+#else
+        pd->is_moisture_ux = DUAL_ROLE_PROP_MOISTURE_UX_ENABLE;
+#endif
+
+#ifdef CONFIG_LGE_USB_MOISTURE_DETECTION_USB_EN
+        pd->moisture_usb_en = DUAL_ROLE_PROP_MOISTURE_USB_ENABLE;
+#else
+        pd->moisture_usb_en = DUAL_ROLE_PROP_MOISTURE_USB_DISABLE;
+#endif
+	/*
+         * Register the Android dual-role class (/sys/class/dual_role_usb/).
+         * The first instance should be named "otg_default" as that's what
+         * Android expects.
+         * Note this is different than the /sys/class/usbpd/ created above.
+         */
+        pd->dr_desc.name = (num_pd_instances == 1) ?
+                                "otg_default" : dev_name(&pd->dev);
+        pd->dr_desc.supported_modes = DUAL_ROLE_SUPPORTED_MODES_DFP_AND_UFP;
+        pd->dr_desc.properties = usbpd_dr_properties;
+        pd->dr_desc.num_properties = ARRAY_SIZE(usbpd_dr_properties);
+        pd->dr_desc.get_property = usbpd_dr_get_property;
+        pd->dr_desc.set_property = usbpd_dr_set_property;
+        pd->dr_desc.property_is_writeable = usbpd_dr_prop_writeable;
+#endif
+	if (device_property_read_bool(parent, "qcom,pd-20-source-only"))
+		pd->pd20_source_only = true;
 
 	/*
 	 * Register a Type-C class instance (/sys/class/typec/portX).
