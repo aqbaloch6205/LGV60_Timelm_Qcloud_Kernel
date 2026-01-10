@@ -2,7 +2,7 @@ qcom,LGE_BLT46_LGC_5000mAh {
 	/* #4340635_LGE_BLT46lgc_5000mAh_averaged_MasterSlave_Jan6th2020*/
 	qcom,max-voltage-uv = <4450000>;
 	qcom,fg-cc-cv-threshold-mv = <4430>;
-	qcom,nom-batt-capacity-mah = <10000>;
+	qcom,nom-batt-capacity-mah = <5000>;
         qcom,fastchg-current-ma = <4850>;
 	qcom,batt-id-kohm = <12>;
 	qcom,battery-beta = <4250>;
@@ -122,3 +122,4 @@ qcom,LGE_BLT46_LGC_5000mAh {
 		 E2 12 00 00
 	];
 };
+
