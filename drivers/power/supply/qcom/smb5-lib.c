@@ -2447,29 +2447,6 @@ int smblib_get_prop_batt_charge_done(struct smb_charger *chg,
 
 	stat = stat & BATTERY_CHARGER_STATUS_MASK;
 	val->intval = (stat == TERMINATE_CHARGE);
-
-	/* Xiaomi Stability Logic: Ensure charger is not suspended before reporting status */
-	chg_en = !(get_client_vote_locked(chg->usb_icl_votable, MAIN_CHG_SUSPEND_VOTER)
-			== MAIN_CHG_SUSPEND_ICL);
-
-	/* LG/Xiaomi Hybrid Logic: Handle the 'Full' state and clean up wakeups */
-	if (val->intval == 1) {
-		rc = smblib_get_prop_batt_capacity(chg, &pval);
-		if (rc < 0) {
-			smblib_err(chg, "Couldn't get batt capacity rc=%d\n", rc);
-		} else if (pval.intval >= 98) {
-			/* Optimize battery life: stop frequent wakeups when nearly full */
-			smblib_set_wdog_bark_timer(chg, BARK_TIMER_LONG);
-			vote(chg->awake_votable, CHG_AWAKE_VOTER, false, 0);
-		}
-
-		/* Safety: If your kernel has Xiaomi's fastcharge mode, reset it here */
-#ifdef CONFIG_FORCE_FAST_CHARGE
-		if (smblib_get_fastcharge_mode(chg) == true)
-			smblib_set_fastcharge_mode(chg, false);
-#endif
-	}
-
 	return 0;
 }
 
@@ -7442,24 +7419,25 @@ irqreturn_t typec_attach_detach_irq_handler(int irq, void *data)
 		 */
 		mutex_lock(&chg->typec_lock);
 
-	if (chg->typec_port && !chg->pr_swap_in_progress) {
-		/*
-		* Schedule the work to differentiate actual removal
-		* of cable and detach interrupt during role swap,
-		* unregister the partner only during actual cable
-		* removal.
-		*/
-		cancel_delayed_work(&chg->pr_swap_detach_work);
-		vote(chg->awake_votable, DETACH_DETECT_VOTER, true, 0);
-		schedule_delayed_work(&chg->pr_swap_detach_work,
-			msecs_to_jiffies(TYPEC_DETACH_DETECT_DELAY_MS));
-		smblib_force_dr_mode(chg, TYPEC_PORT_DRP);
-		/*
-		* To handle cable removal during role
-		* swap failure.
-		*/
-		chg->typec_role_swap_failed = false;
-	}
+		if (chg->typec_port && !chg->pr_swap_in_progress) {
+
+			/*
+			 * Schedule the work to differentiate actual removal
+			 * of cable and detach interrupt during role swap,
+			 * unregister the partner only during actual cable
+			 * removal.
+			 */
+			cancel_delayed_work(&chg->pr_swap_detach_work);
+			vote(chg->awake_votable, DETACH_DETECT_VOTER, true, 0);
+			schedule_delayed_work(&chg->pr_swap_detach_work,
+				msecs_to_jiffies(TYPEC_DETACH_DETECT_DELAY_MS));
+			smblib_force_dr_mode(chg, TYPEC_PORT_DRP);
+			/*
+			 * To handle cable removal during role
+			 * swap failure.
+			 */
+			chg->typec_role_swap_failed = false;
+		}
 
 		mutex_unlock(&chg->typec_lock);
 
