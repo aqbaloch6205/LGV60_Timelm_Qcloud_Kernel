@@ -8555,14 +8555,9 @@ static int ufs_get_device_desc(struct ufs_hba *hba,
 {
 	int err;
 	size_t buff_len;
-<<<<<<< HEAD
 	u8 model_index, lun;
 	u8 *desc_buf;
 	u32 d_lu_wb_buf_alloc;
-=======
-	u8 model_index;
-	u8 *desc_buf;
->>>>>>> d28b753b15c5 (drivers: ufs: Enable UFS write booster for xiaomi sm8250 platform)
 
 	buff_len = max_t(size_t, hba->desc_size.dev_desc,
 			 QUERY_DESC_MAX_SIZE + 1);
@@ -8589,14 +8584,8 @@ static int ufs_get_device_desc(struct ufs_hba *hba,
 
 	model_index = desc_buf[DEVICE_DESC_PARAM_PRDCT_NAME];
 
-<<<<<<< HEAD
-
-	/* Enable WB only for UFS-3.1 or UFS-2.2 OR if desc len >= 0x59 */
-	if ((dev_desc->wspecversion >= 0x310) ||
-=======
 	/* Enable WB only for UFS-3.0 or UFS-2.2 OR if desc len >= 0x59 */
 	if ((dev_desc->wspecversion >= 0x300) ||
->>>>>>> d28b753b15c5 (drivers: ufs: Enable UFS write booster for xiaomi sm8250 platform)
 	    (dev_desc->wspecversion == 0x220) ||
 	    (dev_desc->wmanufacturerid == UFS_VENDOR_TOSHIBA &&
 	     dev_desc->wspecversion >= 0x300 &&
@@ -8610,32 +8599,6 @@ static int ufs_get_device_desc(struct ufs_hba *hba,
 								<< 8 |
 			desc_buf[DEVICE_DESC_PARAM_EXT_UFS_FEATURE_SUP + 3];
 
-<<<<<<< HEAD
-		if (hba->dev_info.b_wb_buffer_type)
-			goto skip_unit_desc;
-
-		hba->dev_info.wb_config_lun = false;
-		for (lun = 0; lun < UFS_UPIU_MAX_GENERAL_LUN; lun++) {
-			d_lu_wb_buf_alloc = 0;
-			err = ufshcd_read_unit_desc_param(hba,
-					lun,
-					UNIT_DESC_PARAM_WB_BUF_ALLOC_UNITS,
-					(u8 *)&d_lu_wb_buf_alloc,
-					sizeof(d_lu_wb_buf_alloc));
-
-			if (err)
-				break;
-
-			if (d_lu_wb_buf_alloc) {
-				hba->dev_info.wb_config_lun = true;
-				break;
-			}
-		}
-	}
-
-skip_unit_desc:
-=======
->>>>>>> d28b753b15c5 (drivers: ufs: Enable UFS write booster for xiaomi sm8250 platform)
 	/* Zero-pad entire buffer for string termination. */
 	memset(desc_buf, 0, buff_len);
 
