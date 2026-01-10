@@ -28,8 +28,6 @@
 extern int lge_get_mfts_mode(void);
 #endif
 
-#include "exposure_adjustment.h"
-
 /**
  * topology is currently defined by a set of following 3 values:
  * 1. num of layer mixers
@@ -776,21 +774,20 @@ error:
 int dsi_panel_set_backlight(struct dsi_panel *panel, u32 bl_lvl)
 {
 	int rc = 0;
-	int bl_dc_min = panel->bl_config.bl_min_level * 2;
 	struct dsi_backlight_config *bl = &panel->bl_config;
 
 	if (panel->host_config.ext_bridge_mode)
 		return 0;
 
 #if IS_ENABLED(CONFIG_LGE_DISPLAY_COMMON)
-	/* 1. First check if LG's Fingerprint High Brightness is active */
 	switch (panel->lge.fp_lhbm_mode) {
 		case LGE_FP_LHBM_READY:
 		case LGE_FP_LHBM_ON:
 		case LGE_FP_LHBM_SM_ON:
 		case LGE_FP_LHBM_FORCED_ON:
-			pr_info("Skip backlight setting for LHBM (FOD Active)\n");
+			pr_info("Skip backlight setting for LHBM\n");
 			return 0;
+		break;
 		case LGE_FP_LHBM_OFF:
 		case LGE_FP_LHBM_SM_OFF:
 		case LGE_FP_LHBM_FORCED_OFF:
@@ -799,23 +796,6 @@ int dsi_panel_set_backlight(struct dsi_panel *panel, u32 bl_lvl)
 				return 0;
 			}
 		break;
-	}
-#endif
-
-	/* 2. If Fingerprint is NOT active, calculate Exposure Adjustment (DC Dimming) */
-	if (bl_lvl > 0 && panel->ea_enabled) {
-		// Calculate digital dimming while keeping physical PWM stable
-		bl_lvl = ea_panel_calc_backlight(panel, &bl_lvl, panel->bl_config.bl_max_level);
-	}
-
-	DSI_INFO("backlight type:%d lvl:%d\n", panel->bl_config.type, bl_lvl);
-
-	/* 3. Skip update if driver signals a 'skip' state (e.g., during transitions) */
-	if (dc_skip_set_backlight(panel, bl_lvl)) {
-		DSI_INFO("skip set backlight because dc enable %d, bl %d\n",
-			panel->ea_enabled, bl_lvl);
-		return 0;
-	
 	}
 #endif
 
