@@ -2435,7 +2435,7 @@ int smblib_get_prop_batt_charge_done(struct smb_charger *chg,
 		return rc;
 	}
 
-	Stat = stat & BATTERY_CHARGER_STATUS_MASK;
+	stat = stat & BATTERY_CHARGER_STATUS_MASK;
 	val->intval = (stat == TERMINATE_CHARGE);
 
 	/* Xiaomi Stability Logic: Ensure charger is not suspended before reporting status */
