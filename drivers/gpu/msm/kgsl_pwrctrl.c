@@ -1,11 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
-<<<<<<< HEAD
  * Copyright (c) 2010-2021, The Linux Foundation. All rights reserved.
  * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
-=======
- * Copyright (c) 2010-2020, The Linux Foundation. All rights reserved.
->>>>>>> 69fb9a27ea13 (msm: kgsl: Add gpu_frequency tracepoint to power trace system)
  */
 
 #include <linux/msm-bus.h>
