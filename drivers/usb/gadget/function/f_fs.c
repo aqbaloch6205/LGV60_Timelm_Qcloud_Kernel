@@ -2191,6 +2191,13 @@ static int ffs_func_eps_enable(struct ffs_function *func)
 		goto done;
 	}
 
+	ffs_log("enter: state %d setup_state %d flag %lu", func->ffs->state,
+		func->ffs->setup_state, func->ffs->flags);
+
+	if (!epfile) {
+		ret = -ENOMEM;
+		goto done;
+	}
 	while (count--) {
 		ep->ep->driver_data = ep;
 
