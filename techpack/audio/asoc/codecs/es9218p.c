@@ -1152,11 +1152,6 @@ static int es9218_set_avc_volume(struct i2c_client *client, int vol)
     int ret = 0;
     u8  value;
 
-    // force vol index = 0 for high impedance modes
-    if(g_headset_type > 1) {
-        vol = 0;
-    }
-
     if (vol >= sizeof(avc_vol_tbl)/sizeof(avc_vol_tbl[0])) {
         pr_err("%s() : Invalid vol = %d return \n", __func__, vol);
         return -EINVAL;
@@ -1168,12 +1163,6 @@ static int es9218_set_avc_volume(struct i2c_client *client, int vol)
 
     ret |= es9218_write_reg(g_es9218_priv->i2c_client, ES9218P_REG_03, value);
     return ret;
-}
-
-static void es9218_call_avc_check(void) {
-    if(g_headset_type > 1) {
-        es9218_set_avc_volume(g_es9218_priv->i2c_client, 0);
-    }
 }
 
 static int es9218_set_thd(struct i2c_client *client, int headset)
@@ -2541,9 +2530,6 @@ static int __es9218_sabre_headphone_on(void)
         es9218p_standby2lpb();
 
         es9218_power_state = ESS_PS_BYPASS;
-
-        // guarantee enough time for plug re-check run like 300ms
-        schedule_delayed_work(&g_es9218_priv->plug_headphone_on_work1, msecs_to_jiffies(300));
         return 0;
     } else if (es9218_power_state == ESS_PS_BYPASS && es9218_is_amp_on) {
 		// if sabre is already powered on and waiting in LPB mode, transition from LPB to HiFi depending on load detected
@@ -2587,8 +2573,6 @@ static int __es9218_sabre_headphone_off(void)
     }
 
     cancel_delayed_work_sync(&g_es9218_priv->hifi_in_standby_work);
-    cancel_delayed_work_sync(&g_es9218_priv->plug_headphone_on_work1);
-    cancel_delayed_work_sync(&g_es9218_priv->plug_headphone_on_work2);
 
 #ifdef ES9219C
     if (g_es9218_priv->es9218_data->is_es9219c){
@@ -2814,8 +2798,6 @@ static void es9218p_initialize_registers(unsigned int ess_mode)
         }
     }
 }
-
-static int is_first_idle = 0;
 static void es9218_sabre_hifi_in_standby_work(struct work_struct *work)
 {
     mutex_lock(&g_es9218_priv->power_lock);
@@ -2846,33 +2828,6 @@ static void es9218_sabre_hifi_in_standby_work(struct work_struct *work)
 
     pr_info("%s() exit - go to hifi mode from standy mode status:%s\n", __func__, power_state[es9218_power_state]);
     mutex_unlock(&g_es9218_priv->power_lock);
-
-    // delay a period on first idle run for warm up
-    if(is_first_idle == 0) {
-        mdelay(30);
-        is_first_idle++;
-    }
-    // check and reset matched avc volume for correct headset type
-    es9218_call_avc_check();
-    return;
-}
-static void es9218_sabre_plug_headphone_on_work1(struct work_struct *work)
-{
-    g_headset_type = forced_headset_type;
-    // delayed work called by the wbhc plug in
-    es9218p_sabre_hifi2lpb();
-    es9218p_sabre_bypass2hifi();
-    es9218_call_avc_check();
-    return;
-}
-
-static void es9218_sabre_plug_headphone_on_work2(struct work_struct *work)
-{
-    g_headset_type = forced_headset_type;
-    // delayed work called by wcd direct thread pcm set
-    es9218p_sabre_hifi2lpb();
-    es9218p_sabre_bypass2hifi();
-    es9218_call_avc_check();
     return;
 }
 
@@ -4215,9 +4170,6 @@ static int es9218_pcm_hw_params(struct snd_pcm_substream *substream,
         ret = es9218p_set_bit_width(g_dop_flag, ESS_MODE_DoP);
     }
 
-    // call a hifi reset with delay after pcm hw set done (from wcd direct/offload thread)
-    schedule_delayed_work(&g_es9218_priv->plug_headphone_on_work2, msecs_to_jiffies(300));
-
     // changing a mode is done here, so reset mode_changed
 	mode_changed = 0;
 
@@ -4233,11 +4185,6 @@ static int es9218_mute(struct snd_soc_dai *dai, int mute)
     u8 reg;
 #ifdef ENABLE_DOP_SOFT_MUTE
     pr_info("%s(): entry, mute_state = %d , power_state = %s\n", __func__, mute ,power_state[es9218_power_state]);
-
-    // reset before the power state check for all scenario
-    if(mute == 0) {
-        es9218_call_avc_check();
-    }
 
     if (es9218_power_state < ESS_PS_HIFI) {
         pr_info("%s() : return = %s\n", __func__, power_state[es9218_power_state]);
@@ -4528,8 +4475,6 @@ static int es9218_probe(struct i2c_client *client,const struct i2c_device_id *id
     g_es9218_priv = priv;
     INIT_DELAYED_WORK(&g_es9218_priv->hifi_in_standby_work, es9218_sabre_hifi_in_standby_work);
     INIT_DELAYED_WORK(&g_es9218_priv->sleep_work, es9218_sabre_sleep_work);
-    INIT_DELAYED_WORK(&g_es9218_priv->plug_headphone_on_work1, es9218_sabre_plug_headphone_on_work1);
-    INIT_DELAYED_WORK(&g_es9218_priv->plug_headphone_on_work2, es9218_sabre_plug_headphone_on_work2);
 
     mutex_init(&g_es9218_priv->power_lock);
 #if 0
