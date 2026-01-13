@@ -644,18 +644,19 @@ static void touch_resume(struct device *dev)
 	/*[TODO] if pdev->id == 1, call subdev resume*/
 	if (0)
 		ret = md->m_driver.resume(dev);
-	atomic_set(&ts->state.fb, FB_RESUME);
-	mutex_unlock(&ts->lock);
+    atomic_set(&ts->state.fb, FB_RESUME);
+    mutex_unlock(&ts->lock);
 
-    if (ts->driver->lpwg) {
-	    int tap2wake_knocked[4] = { 0, 1, 1, 0 };
-	    tap2wake_knocked[0] = tap2wake_status;
-		mutex_lock(&ts->lock);
-		TOUCH_I("tap2wake %s\n", (tap2wake_status) ? "Enabled" : "Disabled");
-		ts->driver->lpwg(ts->dev, LPWG_MASTER, tap2wake_knocked);
-		lpwg_status = tap2wake_status;
-		mutex_unlock(&ts->lock);
-	}
+    /* FIX: Force LPWG to stay active during AOD/Doze transitions */
+    if (ts->driver->lpwg && tap2wake_status) {
+        int tap2wake_params[4] = { 1, 1, 1, 0 }; // 1 at index 0 is the Master Enable bit
+        mutex_lock(&ts->lock);
+        TOUCH_I("AOD/Resume: Re-enabling Tap2Wake (Status: %d)\n", tap2wake_status);
+        ts->driver->lpwg(ts->dev, LPWG_MASTER, tap2wake_params);
+        lpwg_status = 1;
+        mutex_unlock(&ts->lock);
+    }
+
 
 	TOUCH_I("%s End\n", __func__);
 

@@ -248,23 +248,36 @@ static ssize_t store_lpwg_notify(struct device *dev,
 
 int tap2wake_status = 0;
 
-static ssize_t show_tap2wake(struct device *dev, char *buf)
-{
-	return scnprintf(buf, PAGE_SIZE, "%d\n", tap2wake_status);
-}
-
 static ssize_t store_tap2wake(struct device *dev,
 		const char *buf, size_t count)
 {
+	struct touch_core_data *ts = to_touch_core(dev);
 	int status = 0;
-	sscanf(buf, "%d", &status);
+	int tap2wake_params[4] = { 0, 1, 1, 0 }; // LGE standard gesture parameters
 
-    if(status < 0 || status > 1) {
-        TOUCH_E("invalid tap2wake status(%d)\n", status);
-        return 0;
-    }
+	if (sscanf(buf, "%d", &status) <= 0)
+		return -EINVAL;
 
-    tap2wake_status = status;
+	if (status < 0 || status > 1) {
+		TOUCH_E("invalid tap2wake status(%d)\n", status);
+		return -EINVAL;
+	}
+
+	tap2wake_status = status;
+
+	/* FIX: This section pushes the setting to the hardware immediately */
+	if (ts->driver->lpwg) {
+		tap2wake_params[0] = tap2wake_status; // Set the enable bit
+		
+		mutex_lock(&ts->lock);
+		TOUCH_I("Tap2Wake manually updated: %s\n", (tap2wake_status) ? "ON" : "OFF");
+		
+		/* LPWG_MASTER is the key for AOD/Lockscreen persistence */
+		ts->driver->lpwg(ts->dev, LPWG_MASTER, tap2wake_params);
+		lpwg_status = tap2wake_status; 
+		
+		mutex_unlock(&ts->lock);
+	}
 
 	return count;
 }
