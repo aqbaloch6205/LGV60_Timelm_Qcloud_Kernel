@@ -246,8 +246,16 @@ static ssize_t store_lpwg_notify(struct device *dev,
 	return count;
 }
 
+/* 1. Define the status variable */
 int tap2wake_status = 0;
 
+/* 2. Define the SHOW function (Fixes the "undeclared identifier" error) */
+static ssize_t show_tap2wake(struct device *dev, char *buf)
+{
+	return scnprintf(buf, PAGE_SIZE, "%d\n", tap2wake_status);
+}
+
+/* 3. Define the STORE function (Your logic for HyperOS/AOD) */
 static ssize_t store_tap2wake(struct device *dev,
 		const char *buf, size_t count)
 {
