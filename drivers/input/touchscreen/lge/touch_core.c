@@ -240,10 +240,10 @@ irqreturn_t touch_irq_thread(int irq, void *dev_id)
 			touch_send_uevent(ts, TOUCH_UEVENT_AI_PICK);
 
 		if (ts->intr_status & TOUCH_IRQ_SWIPE_LEFT2)
-			touch_send_uevent(ts, TOUCH_UEVENT_SIDE_PAY);
+			touch_send_uevent(ts, TOUCH_UEVENT_SWIPE_LEFT2);
 
 		if (ts->intr_status & TOUCH_IRQ_SWIPE_RIGHT2)
-			touch_send_uevent(ts, TOUCH_UEVENT_SIDE_PAY);
+			touch_send_uevent(ts, TOUCH_UEVENT_SWIPE_RIGHT2);
 
 		if (ts->intr_status & TOUCH_IRQ_LPWG_LONGPRESS_DOWN)
 			touch_send_uevent(ts, TOUCH_UEVENT_LPWG_LONGPRESS_DOWN);
@@ -520,6 +520,13 @@ static int touch_init_input(struct touch_core_data *ts)
 	set_bit(EV_KEY, input->evbit);
 	set_bit(BTN_TOUCH, input->keybit);
 	set_bit(BTN_TOOL_FINGER, input->keybit);
+	set_bit(KEY_WAKEUP, input->keybit);
+	set_bit(KEY_GESTURE_SWIPE_UP, input->keybit);
+	set_bit(KEY_GESTURE_SWIPE_DOWN, input->keybit);
+	set_bit(KEY_GESTURE_SWIPE_LEFT, input->keybit);
+	set_bit(KEY_GESTURE_SWIPE_RIGHT, input->keybit);
+	set_bit(KEY_GESTURE_SWIPE_LEFT2, input->keybit);
+	set_bit(KEY_GESTURE_SWIPE_RIGHT2, input->keybit);
 	set_bit(INPUT_PROP_DIRECT, input->propbit);
 	input_set_abs_params(input, ABS_MT_POSITION_X, 0,
 			ts->caps.max_x, 0, 0);
@@ -562,6 +569,9 @@ error:
 	return ret;
 }
 
+extern int tap2wake_status;
+extern int lpwg_status;
+
 static void touch_suspend(struct device *dev)
 {
 	struct touch_core_data *ts = to_touch_core(dev);
@@ -590,6 +600,17 @@ static void touch_suspend(struct device *dev)
 	if (0)
 		ret = md->m_driver.suspend(dev);
 	mutex_unlock(&ts->lock);
+	
+	if (ts->driver->lpwg) {
+	    int tap2wake_knocked[4] = { 0, 0, 1, 0 };
+	    tap2wake_knocked[0] = tap2wake_status;
+		mutex_lock(&ts->lock);
+		TOUCH_I("tap2wake %s\n", (tap2wake_status) ? "Enabled" : "Disabled");
+		ts->driver->lpwg(ts->dev, LPWG_MASTER, tap2wake_knocked);
+		lpwg_status = tap2wake_status;
+		mutex_unlock(&ts->lock);
+	}
+	
 	TOUCH_I("%s End\n", __func__);
 
 	if (ret == 1)
@@ -625,6 +646,17 @@ static void touch_resume(struct device *dev)
 		ret = md->m_driver.resume(dev);
 	atomic_set(&ts->state.fb, FB_RESUME);
 	mutex_unlock(&ts->lock);
+
+    if (ts->driver->lpwg) {
+	    int tap2wake_knocked[4] = { 0, 1, 1, 0 };
+	    tap2wake_knocked[0] = tap2wake_status;
+		mutex_lock(&ts->lock);
+		TOUCH_I("tap2wake %s\n", (tap2wake_status) ? "Enabled" : "Disabled");
+		ts->driver->lpwg(ts->dev, LPWG_MASTER, tap2wake_knocked);
+		lpwg_status = tap2wake_status;
+		mutex_unlock(&ts->lock);
+	}
+
 	TOUCH_I("%s End\n", __func__);
 
 	if (ret == 0)
@@ -759,6 +791,8 @@ char *uevent_str[TOUCH_UEVENT_SIZE][2] = {
 	{"TOUCH_GESTURE_WAKEUP=SWIPE_UP", NULL},
 	{"TOUCH_GESTURE_WAKEUP=SWIPE_LEFT", NULL},
 	{"TOUCH_GESTURE_WAKEUP=SWIPE_RIGHT", NULL},
+	{"TOUCH_GESTURE_WAKEUP=SWIPE_LEFT2", NULL},
+	{"TOUCH_GESTURE_WAKEUP=SWIPE_RIGHT2", NULL},
 	{"TOUCH_GESTURE_WAKEUP=WATER_MODE_ON", NULL},
 	{"TOUCH_GESTURE_WAKEUP=WATER_MODE_OFF", NULL},
 	{"TOUCH_GESTURE_WAKEUP=AI_BUTTON", NULL},
@@ -774,6 +808,10 @@ char *uevent_str[TOUCH_UEVENT_SIZE][2] = {
 	{"TOUCH_GESTURE_WAKEUP=SWITCH_AES_TO_2", NULL},
 	{"TOUCH_GESTURE_WAKEUP=DS_UPDATE_STATE", NULL},
 };
+
+#ifdef CONFIG_LGE_TOUCH_LGSIC_SW42902
+extern int udfps_pressed_status;
+#endif
 
 void touch_send_uevent(struct touch_core_data *ts, int type)
 {
@@ -817,13 +855,69 @@ void touch_send_uevent(struct touch_core_data *ts, int type)
 			TOUCH_I("%s  is not sent\n", uevent_str[type][0]);
 		}
 	}
-	if (type == LPWG_DOUBLE_TAP) {
-		input_report_key(ts->input, KEY_WAKEUP, 1);
-		TOUCH_I("Simulate power button depress\n");
-		input_sync(ts->input);
-		input_report_key(ts->input, KEY_WAKEUP, 0);
-		TOUCH_I("Simulate power button release\n");
-		input_sync(ts->input);
+	switch (type) {
+		case TOUCH_UEVENT_KNOCK:
+			input_report_key(ts->input, KEY_WAKEUP, 1);
+			TOUCH_I("Simulate power button depress\n");
+			input_sync(ts->input);
+			input_report_key(ts->input, KEY_WAKEUP, 0);
+			TOUCH_I("Simulate power button release\n");
+			input_sync(ts->input);
+			break;
+		case TOUCH_UEVENT_SWIPE_DOWN:
+			TOUCH_I("Swipe DOWN reported\n");
+			input_report_key(ts->input, KEY_GESTURE_SWIPE_DOWN, 1);
+			input_sync(ts->input);
+			input_report_key(ts->input, KEY_GESTURE_SWIPE_DOWN, 0);
+			input_sync(ts->input);
+			break;
+		case TOUCH_UEVENT_SWIPE_UP:
+			TOUCH_I("Swipe UP reported\n");
+			input_report_key(ts->input, KEY_GESTURE_SWIPE_UP, 1);
+			input_sync(ts->input);
+			input_report_key(ts->input, KEY_GESTURE_SWIPE_UP, 0);
+			input_sync(ts->input);
+			break;
+		case TOUCH_UEVENT_SWIPE_LEFT:
+			TOUCH_I("Swipe LEFT reported\n");
+			input_report_key(ts->input, KEY_GESTURE_SWIPE_LEFT, 1);
+			input_sync(ts->input);
+			input_report_key(ts->input, KEY_GESTURE_SWIPE_LEFT, 0);
+			input_sync(ts->input);
+			break;
+		case TOUCH_UEVENT_SWIPE_RIGHT:
+			TOUCH_I("Swipe RIGHT reported\n");
+			input_report_key(ts->input, KEY_GESTURE_SWIPE_RIGHT, 1);
+			input_sync(ts->input);
+			input_report_key(ts->input, KEY_GESTURE_SWIPE_RIGHT, 0);
+			input_sync(ts->input);
+			break;
+		case TOUCH_UEVENT_SWIPE_LEFT2:
+			TOUCH_I("Swipe LEFT2 reported\n");
+			input_report_key(ts->input, KEY_GESTURE_SWIPE_LEFT2, 1);
+			input_sync(ts->input);
+			input_report_key(ts->input, KEY_GESTURE_SWIPE_LEFT2, 0);
+			input_sync(ts->input);
+			break;
+		case TOUCH_UEVENT_SWIPE_RIGHT2:
+			TOUCH_I("Swipe RIGHT2 reported\n");
+			input_report_key(ts->input, KEY_GESTURE_SWIPE_RIGHT2, 1);
+			input_sync(ts->input);
+			input_report_key(ts->input, KEY_GESTURE_SWIPE_RIGHT2, 0);
+			input_sync(ts->input);
+			break;
+#ifdef CONFIG_LGE_TOUCH_LGSIC_SW42902
+		case TOUCH_UEVENT_LPWG_LONGPRESS_DOWN:
+			TOUCH_I("Touch UDFPS DOWN reported\n");
+			udfps_pressed_status = 1;
+			break;
+		case TOUCH_UEVENT_LPWG_LONGPRESS_UP:
+			TOUCH_I("Touch UDFPS UP reported\n");
+			udfps_pressed_status = 0;
+			break;
+#endif
+		default:
+			break;
 	}
 }
 
