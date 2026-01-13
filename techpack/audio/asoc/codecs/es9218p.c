@@ -1037,66 +1037,30 @@ static int es9219c_sabre_clk_source_set(unsigned int clk_source, unsigned int pl
 #ifdef DRE_ENABLE
 static int es9219c_DRE_setting( void ){
 	int ret = 0;
-	int imp_load = g_headset_type;
 
-    pr_info("%s(): entry\n", __func__);
+    pr_info("%s(): Forcing Advanced DRE thresholds for Unmatchable Audio\n", __func__);
 
-	switch(imp_load)
-	{
+    /* * We ignore 'imp_load' and always apply the 'advance' registers.
+     * This provides the highest dynamic range headroom for the forced HiFi2 mode.
+     */
+    ret = es9218_write_reg(g_es9218_priv->i2c_client, ES9219C_REG_141, advance_DRE_on_threshold[0]);
+    ret = es9218_write_reg(g_es9218_priv->i2c_client, ES9219C_REG_142, advance_DRE_on_threshold[1]);
+    ret = es9218_write_reg(g_es9218_priv->i2c_client, ES9219C_REG_143, advance_DRE_off_threshold[0]);
+    ret = es9218_write_reg(g_es9218_priv->i2c_client, ES9219C_REG_144, advance_DRE_off_threshold[1]);
 
-		case 1: // Normal
-			ret = es9218_write_reg(g_es9218_priv->i2c_client, ES9219C_REG_141, normal_DRE_on_threshold[0]);
-			ret = es9218_write_reg(g_es9218_priv->i2c_client, ES9219C_REG_142, normal_DRE_on_threshold[1]);
-			ret = es9218_write_reg(g_es9218_priv->i2c_client, ES9219C_REG_143, normal_DRE_off_threshold[0]);
-			ret = es9218_write_reg(g_es9218_priv->i2c_client, ES9219C_REG_144, normal_DRE_off_threshold[1]);
-
-			ret = es9218_write_reg(g_es9218_priv->i2c_client, ES9219C_REG_137, normal_DRE_gain_left[0]);
-			ret = es9218_write_reg(g_es9218_priv->i2c_client, ES9219C_REG_138, normal_DRE_gain_left[1]);
-			ret = es9218_write_reg(g_es9218_priv->i2c_client, ES9219C_REG_139, normal_DRE_gain_right[0]);
-			ret = es9218_write_reg(g_es9218_priv->i2c_client, ES9219C_REG_140, normal_DRE_gain_right[1]);
-			ret = es9218_write_reg(g_es9218_priv->i2c_client, ES9219C_REG_145, normal_DRE_decay_rate);
-			break;
-
-		case 2: // Advanced
-			ret = es9218_write_reg(g_es9218_priv->i2c_client, ES9219C_REG_141, advance_DRE_on_threshold[0]);
-			ret = es9218_write_reg(g_es9218_priv->i2c_client, ES9219C_REG_142, advance_DRE_on_threshold[1]);
-			ret = es9218_write_reg(g_es9218_priv->i2c_client, ES9219C_REG_143, advance_DRE_off_threshold[0]);
-			ret = es9218_write_reg(g_es9218_priv->i2c_client, ES9219C_REG_144, advance_DRE_off_threshold[1]);
-
-			ret = es9218_write_reg(g_es9218_priv->i2c_client, ES9219C_REG_137, advance_DRE_gain_left[0]);
-			ret = es9218_write_reg(g_es9218_priv->i2c_client, ES9219C_REG_138, advance_DRE_gain_left[1]);
-			ret = es9218_write_reg(g_es9218_priv->i2c_client, ES9219C_REG_139, advance_DRE_gain_right[0]);
-			ret = es9218_write_reg(g_es9218_priv->i2c_client, ES9219C_REG_140, advance_DRE_gain_right[1]);
-			ret = es9218_write_reg(g_es9218_priv->i2c_client, ES9219C_REG_145, advance_DRE_decay_rate);
-			break;
-
-
-		case 3: // AUX
-			ret = es9218_write_reg(g_es9218_priv->i2c_client, ES9219C_REG_141, aux_DRE_on_threshold[0]);
-			ret = es9218_write_reg(g_es9218_priv->i2c_client, ES9219C_REG_142, aux_DRE_on_threshold[1]);
-			ret = es9218_write_reg(g_es9218_priv->i2c_client, ES9219C_REG_143, aux_DRE_off_threshold[0]);
-			ret = es9218_write_reg(g_es9218_priv->i2c_client, ES9219C_REG_144, aux_DRE_off_threshold[1]);
-
-			ret = es9218_write_reg(g_es9218_priv->i2c_client, ES9219C_REG_137, aux_DRE_gain_left[0]);
-			ret = es9218_write_reg(g_es9218_priv->i2c_client, ES9219C_REG_138, aux_DRE_gain_left[1]);
-			ret = es9218_write_reg(g_es9218_priv->i2c_client, ES9219C_REG_139, aux_DRE_gain_right[0]);
-			ret = es9218_write_reg(g_es9218_priv->i2c_client, ES9219C_REG_140, aux_DRE_gain_right[1]);
-			ret = es9218_write_reg(g_es9218_priv->i2c_client, ES9219C_REG_145, aux_DRE_decay_rate);
-			break;
-
-		default :
-		   pr_err("%s() : Invalid DRE set(heaset_type)  \n", __func__, g_headset_type);
-		   break;
-	}
+    ret = es9218_write_reg(g_es9218_priv->i2c_client, ES9219C_REG_137, advance_DRE_gain_left[0]);
+    ret = es9218_write_reg(g_es9218_priv->i2c_client, ES9219C_REG_138, advance_DRE_gain_left[1]);
+    ret = es9218_write_reg(g_es9218_priv->i2c_client, ES9219C_REG_139, advance_DRE_gain_right[0]);
+    ret = es9218_write_reg(g_es9218_priv->i2c_client, ES9219C_REG_140, advance_DRE_gain_right[1]);
+    ret = es9218_write_reg(g_es9218_priv->i2c_client, ES9219C_REG_145, advance_DRE_decay_rate);
 
 	if(ret == 0 )
 	{
-		ret = es9218_write_reg(g_es9218_priv->i2c_client, ES9219C_REG_136, 0x11); //  DRE_enable, DRE_Vol CTRL
-		return ret;
+		// Enable DRE and DRE Volume Control
+		ret = es9218_write_reg(g_es9218_priv->i2c_client, ES9219C_REG_136, 0x11); 
 	}
-	else
-		return ret;
-
+	
+	return ret;
 }
 #endif /* DRE_ENABLE */
 
@@ -1175,170 +1139,45 @@ static int es9218_set_avc_volume(struct i2c_client *client, int vol)
 
 static int es9218_set_thd(struct i2c_client *client, int headset)
 {
-    int ret = 0;
+    /* Always apply Advanced Compensation for HiFi2 */
+    es9218_write_reg(g_es9218_priv->i2c_client, ES9218P_REG_22, advance_harmonic_comp_left[0]);
+    es9218_write_reg(g_es9218_priv->i2c_client, ES9218P_REG_23, advance_harmonic_comp_left[1]);
+    es9218_write_reg(g_es9218_priv->i2c_client, ES9218P_REG_24, advance_harmonic_comp_left[2]);
+    es9218_write_reg(g_es9218_priv->i2c_client, ES9218P_REG_25, advance_harmonic_comp_left[3]);
 
-    switch (headset) {
-         case 1: // normal
-            /*  Reg #22, #23    : THD_comp2 (-16dB) */
-            ret = es9218_write_reg(g_es9218_priv->i2c_client, ES9218P_REG_22, normal_harmonic_comp_left[0]);
-            ret = es9218_write_reg(g_es9218_priv->i2c_client, ES9218P_REG_23, normal_harmonic_comp_left[1]);
-
-            /*  Reg #24, #25    : THD_comp3 (-16dB) */
-            ret = es9218_write_reg(g_es9218_priv->i2c_client, ES9218P_REG_24, normal_harmonic_comp_left[2]);
-            ret = es9218_write_reg(g_es9218_priv->i2c_client, ES9218P_REG_25, normal_harmonic_comp_left[3]);
-
-            /*  Reg #53, #54    : THD_comp2 (-16dB) */
-            ret = es9218_write_reg(g_es9218_priv->i2c_client, ES9218P_REG_53, normal_harmonic_comp_right[0]);
-            ret = es9218_write_reg(g_es9218_priv->i2c_client, ES9218P_REG_54, normal_harmonic_comp_right[1]);
-
-            /*  Reg #55, #56    : THD_comp3 (-16dB) */
-            ret = es9218_write_reg(g_es9218_priv->i2c_client, ES9218P_REG_55, normal_harmonic_comp_right[2]);
-            ret = es9218_write_reg(g_es9218_priv->i2c_client, ES9218P_REG_56, normal_harmonic_comp_right[3]);
-            break;
-
-        case 2: // advanced
-            /*  Reg #22, #23    : THD_comp2 (-1dB)  */
-            ret = es9218_write_reg(g_es9218_priv->i2c_client, ES9218P_REG_22, advance_harmonic_comp_left[0]);
-            ret = es9218_write_reg(g_es9218_priv->i2c_client, ES9218P_REG_23, advance_harmonic_comp_left[1]);
-
-            /*  Reg #24, #25    : THD_comp3 (-1dB)  */
-            ret = es9218_write_reg(g_es9218_priv->i2c_client, ES9218P_REG_24, advance_harmonic_comp_left[2]);
-            ret = es9218_write_reg(g_es9218_priv->i2c_client, ES9218P_REG_25, advance_harmonic_comp_left[3]);
-
-            /*  Reg #53, #54    : THD_comp2 (-16dB) */
-            ret = es9218_write_reg(g_es9218_priv->i2c_client, ES9218P_REG_53, advance_harmonic_comp_right[0]);
-            ret = es9218_write_reg(g_es9218_priv->i2c_client, ES9218P_REG_54, advance_harmonic_comp_right[1]);
-
-            /*  Reg #55, #56    : THD_comp3 (-16dB) */
-            ret = es9218_write_reg(g_es9218_priv->i2c_client, ES9218P_REG_55, advance_harmonic_comp_right[2]);
-            ret = es9218_write_reg(g_es9218_priv->i2c_client, ES9218P_REG_56, advance_harmonic_comp_right[3]);
-            break;
-
-        case 3: // aux
-            /*  Reg #22, #23    : THD_comp2 (-7dB)  */
-            ret = es9218_write_reg(g_es9218_priv->i2c_client, ES9218P_REG_22, aux_harmonic_comp_left[0]);
-            ret = es9218_write_reg(g_es9218_priv->i2c_client, ES9218P_REG_23, aux_harmonic_comp_left[1]);
-
-            /*  Reg #24, #25    : THD_comp3 (-7dB)  */
-            ret = es9218_write_reg(g_es9218_priv->i2c_client, ES9218P_REG_24, aux_harmonic_comp_left[2]);
-            ret = es9218_write_reg(g_es9218_priv->i2c_client, ES9218P_REG_25, aux_harmonic_comp_left[3]);
-
-            /*  Reg #53, #54    : THD_comp2 (-16dB) */
-            ret = es9218_write_reg(g_es9218_priv->i2c_client, ES9218P_REG_53, aux_harmonic_comp_right[0]);
-            ret = es9218_write_reg(g_es9218_priv->i2c_client, ES9218P_REG_54, aux_harmonic_comp_right[1]);
-
-            /*  Reg #55, #56    : THD_comp3 (-16dB) */
-            ret = es9218_write_reg(g_es9218_priv->i2c_client, ES9218P_REG_55, aux_harmonic_comp_right[2]);
-            ret = es9218_write_reg(g_es9218_priv->i2c_client, ES9218P_REG_56, aux_harmonic_comp_right[3]);
-            break;
-
-        default :
-            pr_err("%s() : Invalid headset = %d \n", __func__, headset);
-            break;
-    }
-    pr_info("%s(): Headset Type = %d \n", __func__, headset);
-    return ret;
+    es9218_write_reg(g_es9218_priv->i2c_client, ES9218P_REG_53, advance_harmonic_comp_right[0]);
+    es9218_write_reg(g_es9218_priv->i2c_client, ES9218P_REG_54, advance_harmonic_comp_right[1]);
+    es9218_write_reg(g_es9218_priv->i2c_client, ES9218P_REG_55, advance_harmonic_comp_right[2]);
+    es9218_write_reg(g_es9218_priv->i2c_client, ES9218P_REG_56, advance_harmonic_comp_right[3]);
+    
+    return 0;
 }
 
 static int es9218p_sabre_amp_start(struct i2c_client *client, int headset)
 {
-    int ret = 0;
-
-    //NOTE  GPIO2 must already be HIGH as part of standby2lpb
+    /* We ignore 'headset' variable and force HiFi2 */
+    pr_notice("[QUAD_DAC] Auto-triggering High Impedance (HiFi2) Mode\n");
+    
 #ifdef CONFIG_MACH_SDM845_JUDY
-    //if(!g_dop_flag)
-        es9218_hph_switch_gpio_L();
+    es9218_hph_switch_gpio_L();
 #endif
 
-    switch(headset) {
-         case 1:
-            //  normal
-            //
-            //  Low impedance 50RZ or less headphone detected
-            //  Use HiFi1 amplifier mode
-            //
-            pr_notice("%s() : 1 valid headset = %d changing to hifi1.\n", __func__, g_headset_type);
-            es9218p_sabre_lpb2hifione();
-            break;
-
-        case 2:
-            //  advanced
-            //
-            //  High impedance >50RZ - <600RZ headphone detected (64RZ or 300RZ for example)
-            //  Use HiFi2 amplifier mode
-            //
-            pr_notice("%s() : 2 valid headset = %d changing to hifi2.\n", __func__, g_headset_type);
-            es9218p_sabre_lpb2hifitwo();
-            break;
-
-        case 3:
-            //  aux
-            //
-            //  High impedance >600RZ line-out detected
-            //  Use HiFi1 amplifier mode
-            //
-            pr_notice("%s() : 3 valid headset = %d changing to hifi1.\n", __func__, g_headset_type);
-            es9218p_sabre_lpb2hifione();
-            break;
-
-        default :
-            pr_err("%s() : Unknown headset = %d \n", __func__, headset);
-            ret = 1;
-            break;
-    }
+    // This single call automates the hardware gain/power transition
+    es9218p_sabre_lpb2hifitwo(); 
 
 #ifdef CONFIG_MACH_SDM845_JUDY
-    //if(!g_dop_flag)
-        es9218_hph_switch_gpio_H();
-#endif /* CONFIG_MACH_SDM845_JUDY */
-
-    return ret;
+    es9218_hph_switch_gpio_H();
+#endif
+    return 0;
 }
 
 static int es9218p_sabre_amp_stop(struct i2c_client *client, int headset)
 {
-    int ret = 0;
-
-    switch(headset) {
-         case 1:
-            //  normal
-            //
-            //  Low impedance 32RZ or less headphone detected
-            //  Use HiFi1 amplifier mode
-            //
-            pr_notice("%s() : 1 valid headset = %d changing to lbp.\n", __func__, g_headset_type);
-            es9218p_sabre_hifione2lpb();
-            break;
-
-        case 2:
-            //  advanced
-            //
-            //  High impedance >32RZ - <600RZ headphone detected (64RZ or 300RZ for example)
-            //  Use HiFi2 amplifier mode
-            //
-            pr_notice("%s() : 2 valid headset = %d changing to lbp.\n", __func__, g_headset_type);
-            es9218p_sabre_hifitwo2lpb();
-            break;
-
-        case 3:
-            //  aux
-            //
-            //  High impedance >600RZ line-out detected
-            //  Use HiFi1 amplifier mode
-            //
-            pr_notice("%s() : 3 valid headset = %d changing to lbp.\n", __func__, g_headset_type);
-            es9218p_sabre_hifione2lpb();
-            break;
-
-        default :
-            pr_err("%s() : Invalid headset = %d \n", __func__, g_headset_type);
-            ret = 1;
-            break;
-    }
-
-    return ret;
+    pr_notice("[QUAD_DAC] Cleanly stopping HiFi2 Mode\n");
+    // Always use the hifitwo shutdown path
+    es9218p_sabre_hifitwo2lpb();
+    return 0;
 }
-
 
 /*
  *  Program stage1 and stage2 filter coefficients
