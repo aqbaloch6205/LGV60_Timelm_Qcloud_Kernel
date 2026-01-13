@@ -47,7 +47,7 @@
 
 #define     ES9218P_SYSFS               // use this feature only for user debug, not release
 
-#define     USE_HPAHiQ                  // THD increased by ~2dB and Power Consumption increasded by ~2mA
+//#define     USE_HPAHiQ                  // THD increased by ~2dB and Power Consumption increasded by ~2mA
 //#define   ES9218P_DEBUG               // ESS pop-click debugging, define to enable step by step override sequence debug messages and time delays.  Use to pinpoint pop-click.
 #define     WORKAROUND_FOR_CORNER_SAMPLES     // set ResetB high two times and send a cmd of soft reset
 #define     ENABLE_DOP_AUTO_MUTE
@@ -122,43 +122,61 @@ static struct clk *hifi_ext_mclk;
  */
 
 struct es9218_reg es9218_common_init_registers[] = {
-    // 1. Force System On & High Performance Rail
-    { ES9218P_REG_00,        0x00 },    // Normal Operation
-    { ES9218P_REG_01,        0x00 },    // Force Charge Pump to High-Voltage Rail (2Vrms Ready)
-    
-    // 2. Force Max Analog Volume (0dB Reference)
-    // 0x00 ensures no analog attenuation, providing the highest SNR.
-    { ES9218P_REG_03,        0x00 },    
+//will be upadated  { ES9218P_REG_00,        0x00 },    // System Register
+//will be upadated  { ES9218P_REG_01,        0x8c },    // Input selection
+//default           { ES9218P_REG_02,        0x34 },    // Mixing, Serial Data and Automute Configuration
+//will be upadated  { ES9218P_REG_03,        0x58 },    // Analog Volume Control
+//default           { ES9218P_REG_04,        0x00 },    // Automute Time
+//default           { ES9218P_REG_05,        0x68 },    // Automute Level
+//will be upadated  { ES9218P_REG_06,        0x42 },    // DoP and Volmue Ramp Rate
+//will be upadated  { ES9218P_REG_07,        0x80 },    // Filter Bandwidth and System Mute
+//default           { ES9218P_REG_08,        0xdd },    // GPIO1-2 Confgiguratioin
+//			{ ES9218P_REG_08,        0xd3 },    // GPIO1 clk debug setting
 
-    // 3. Gaming & Clarity Optimization
-    // REG 6: Set to 0x00 to disable Soft Mute Ramp (Instant audio response for gaming)
-    // REG 7: Set to 0x80 for Filter 8 (Short Delay Sharp). Best imaging and zero pre-ringing.
-    { ES9218P_REG_06,        0x00 },    
-    { ES9218P_REG_07,        0x80 },    
-
-    { ES9218P_REG_11,        0x90 },    // Overcurrent Protection
-    { ES9218P_REG_12,        0x8a },    // DPLL Bandwidth (Stable Jitter Reduction)
-    { ES9218P_REG_13,        0x00 },    // Enable THD Compensation Path
-    { ES9218P_REG_14,        0x25 },    // Soft Start Configuration
-
-    // 4. Force Digital Path 100% Open (Bit-Perfect 0dB Lock)
-    // 0x7FFFFFFF is the mathematical limit for 32-bit Unity Gain.
-    { ES9218P_REG_17,        0x7f },    // Master Trim MSB
-    { ES9218P_REG_18,        0xff },    
-    { ES9218P_REG_19,        0xff },    
-    { ES9218P_REG_20,        0xff },    // Master Trim LSB
-
-    { ES9218P_REG_21,        0x0d },    
-    { ES9218P_REG_27,        0xc4 },    
-    { ES9218P_REG_30,        0x37 },    
-    { ES9218P_REG_31,        0x30 },    
-
-    // 5. Force High Impedance Mode (2Vrms Hardware Lock)
-    // 0x03 forces the internal switches to the High-Impedance (Advanced) path.
-    { ES9218P_REG_32,        0x03 },    
+//will be upadated  { ES9218P_REG_10,        0x02 },    // Master Mode and Sync Configuration
+                    { ES9218P_REG_11,        0x90 },    // Overcureent Protection
+                    { ES9218P_REG_12,        0x8a },    // ASRC/DPLL Bandwidth
+                    { ES9218P_REG_13,        0x00 },    // THD Compensation Bypass & Mono Mode
+                    { ES9218P_REG_14,        0x25 },    // Soft Start Configuration // updated_ESS_1122
+//will be upadated  { ES9218P_REG_15,        0x50 },    // Volume Control
+//will be upadated  { ES9218P_REG_16,        0x50 },    // Volume Control
+//will be upadated  { ES9218P_REG_17,        0xff },    // Master Trim
+//will be upadated  { ES9218P_REG_18,        0xff },    // Master Trim
+//will be upadated  { ES9218P_REG_19,        0xff },    // Master Trim
+//will be upadated  { ES9218P_REG_20,        0x7f },    // Master Trim
+                    { ES9218P_REG_21,        0x0d },    // GPIO Input Selection  // updated_ESS_1122
+//will be upadated  { ES9218P_REG_22,        0x00 },    // THD Compensation C2 (left)
+//will be upadated  { ES9218P_REG_23,        0x00 },    // THD Compensation C2 (left)
+//will be upadated  { ES9218P_REG_24,        0x00 },    // THD Compensation C3 (left)
+//will be upadated  { ES9218P_REG_25,        0x00 },    // THD Compensation C3 (left)
+//will be upadated  { ES9218P_REG_26,        0x62 },    // Charge Pump Soft Start Delay
+                    { ES9218P_REG_27,        0xc4 },    // Charge Pump Soft Start Delay
+//will be upadated  { ES9218P_REG_29,        0x00 },    // General Confguration
+                    { ES9218P_REG_30,        0x37 },    // GPIO Inversion & Automatic Clock Gearing
+                    { ES9218P_REG_31,        0x30 },    // GPIO Inversion & Automatic Clock Gearing
+//will be upadated  { ES9218P_REG_32,        0x00 },    // Amplifier Configuration
+//default           { ES9218P_REG_34,        0x00 },    // Programmable NCO
+//default           { ES9218P_REG_35,        0x00 },    // Programmable NCO
+//default           { ES9218P_REG_36,        0x00 },    // Programmable NCO
+//default           { ES9218P_REG_37,        0x00 },    // Programmable NCO
+//default           { ES9218P_REG_40,        0x00 },    // Programmable FIR RAM Address
+//default           { ES9218P_REG_41,        0x00 },    // Programmable FIR RAM Data
+//default           { ES9218P_REG_42,        0x00 },    // Programmable FIR RAM Data
+//default           { ES9218P_REG_43,        0x00 },    // Programmable FIR RAM Data
+//will be upadated  { ES9218P_REG_44,        0x00 },    // Programmable FIR Configuration
+//will be upadated  { ES9218P_REG_45,        0x00 },    // Analog Control Override
+//will be upadated  { ES9218P_REG_46,        0x00 },    // dig_over_en/reserved/apdb/cp_clk_sel/reserved
+//will be upadated  { ES9218P_REG_47,        0x00 },    // enfcb/encp_oe/enaux_oe/cpl_ens/cpl_enw/sel3v3_ps/ensm_ps/sel3v3_cph
+//will be upadated  { ES9218P_REG_48,        0x02 },    // reserved/enhpa_out/reverved
+//default           { ES9218P_REG_49,        0x62 },    // Automatic Clock Gearing Thresholds
+//default           { ES9218P_REG_50,        0xc0 },    // Automatic Clock Gearing Thresholds
+//default           { ES9218P_REG_51,        0x0d },    // Automatic Clock Gearing Thresholds
+//will be upadated  { ES9218P_REG_53,        0x00 },    // THD Compensation C2 (Right)
+//will be upadated  { ES9218P_REG_54,        0x00 },    // THD Compensation C2 (Right)
+//will be upadated  { ES9218P_REG_55,        0x00 },    // THD Compensation C3 (Right)
+//will be upadated  { ES9218P_REG_56,        0x00 },    // THD Compensation C3 (Right)
+//default           { ES9218P_REG_60,        0x00 },    // DAC Analog Trim Control
 };
-
-
 
 struct es9218_reg   es9218_PCM_init_register[] = {
 	{ ES9218P_REG_00,        0x00 },    // System Register - 0x00(default)
@@ -326,7 +344,7 @@ static unsigned int es9218_rate = 48000;
 #ifdef ES9218P_NCO
 static unsigned int es9218_mclk = 49152000;
 #endif
-static int g_headset_type = 1;
+static int g_headset_type = 0;
 static int g_avc_volume = 0;
 static int g_volume = 0;
 static int g_left_volume = 0;
@@ -406,7 +424,7 @@ static u8  aux_DRE_off_threshold[2] = {0xf5, 0x2d};
 static u8  aux_DRE_decay_rate = 0x0a;
 #endif// DRE_ENABLE
 
-#define X_TALK_ENHANCEMENT_ENABLE //1121
+//#define X_TALK_ENHANCEMENT_ENABLE //1121
 #ifdef X_TALK_ENHANCEMENT_ENABLE
 static int es9219c_crosstalk_enhancement( void );
 static u8  crosstalk_scale_ch1[2] = {0x03, 0x0d};
@@ -1046,39 +1064,60 @@ static int es9219c_DRE_setting( void ){
 }
 #endif /* DRE_ENABLE */
 
-#define X_TALK_ENHANCEMENT_ENABLE // Enabled for max separation
+#ifdef X_TALK_ENHANCEMENT_ENABLE //1121
 static int es9219c_crosstalk_enhancement( void )
 {
-    int ret = 0;
-    // FORCE imp_load to 1 (High Impedance/Advanced Mode)
-    int imp_load = 1; 
+	int ret = 0;
 
-    if (imp_load == 1)
-    {
-        pr_info("[QUAD_DAC] Forcing High-Impedance Crosstalk Enhancement\n");
+	int imp_load = g_headset_type;
+
+	if (imp_load == 1)
+	{
         ret = es9218_write_reg(g_es9218_priv->i2c_client, ES9219C_REG_130, crosstalk_scale_ch1[0]);
         ret = es9218_write_reg(g_es9218_priv->i2c_client, ES9219C_REG_131, crosstalk_scale_ch1[1]);
         ret = es9218_write_reg(g_es9218_priv->i2c_client, ES9219C_REG_132, crosstalk_scale_ch2[0]);
         ret = es9218_write_reg(g_es9218_priv->i2c_client, ES9219C_REG_133, crosstalk_scale_ch2[1]);
 
-        ret = es9218_write_reg(g_es9218_priv->i2c_client, ES9219C_REG_128, 0x04); // Crosstalk_enable
-    }
-    return ret;
+        ret = es9218_write_reg(g_es9218_priv->i2c_client, ES9219C_REG_128, 0x04); // Crostalk_enable
+
+	}
+	return ret;
 }
 #endif // X_TALK_ENHANCEMENT_ENABLE
 
 #endif // ES9219c
 
-static void es9218_master_trim(struct i2c_client *client, int volume)
+static int es9218_master_trim(struct i2c_client *client, int vol)
 {
-    // We ignore the 'volume' argument and force the 0dB Hard-Code
-    es9218_write_reg(client, ES9218P_REG_17, 0x7f);
-    es9218_write_reg(client, ES9218P_REG_18, 0xff);
-    es9218_write_reg(client, ES9218P_REG_19, 0xff);
-    es9218_write_reg(client, ES9218P_REG_20, 0xff);
-    pr_info("[QUAD_DAC] Master Trim Shield: Locked at 0dB\n");
-}
+    int ret = 0;
+    u32 value;
 
+    if (vol >= sizeof(master_trim_tbl)/sizeof(master_trim_tbl[0])) {
+        pr_err("%s() : Invalid vol = %d return \n", __func__, vol);
+        return 0;
+    }
+
+    value = master_trim_tbl[vol];
+    pr_info("%s(): MasterTrim = %08X \n", __func__, value);
+
+    if  (es9218_power_state == ESS_PS_IDLE) {
+        pr_err("%s() : Invalid vol = %d return \n", __func__, vol);
+        return 0;
+    }
+
+    ret |= es9218_write_reg(g_es9218_priv->i2c_client , ES9218P_REG_17,
+                        value&0xFF);
+
+    ret |= es9218_write_reg(g_es9218_priv->i2c_client,  ES9218P_REG_18,
+                        (value&0xFF00)>>8);
+
+    ret |= es9218_write_reg(g_es9218_priv->i2c_client,  ES9218P_REG_19,
+                        (value&0xFF0000)>>16);
+
+    ret |= es9218_write_reg(g_es9218_priv->i2c_client,  ES9218P_REG_20,
+                        (value&0xFF000000)>>24);
+    return ret;
+}
 
 static int es9218_set_avc_volume(struct i2c_client *client, int vol)
 {
@@ -1116,16 +1155,21 @@ static int es9218_set_thd(struct i2c_client *client, int headset)
 
 static int es9218p_sabre_amp_start(struct i2c_client *client, int headset)
 {
-    // FORCE "True High DAC" Mode (HiFi2) for EVERYTHING
-    pr_info("%s(): FORCING HIGH IMPEDANCE MODE (2Vrms) for Gaming/Music\n", __func__);
+    /* We ignore 'headset' variable and force HiFi2 */
+    pr_notice("[QUAD_DAC] Auto-triggering High Impedance (HiFi2) Mode\n");
+    
+#ifdef CONFIG_MACH_SDM845_JUDY
+    es9218_hph_switch_gpio_L();
+#endif
 
-    // Originally this checked 'headset' type. We bypass that.
-    // Ensure we always call the High-Power (Two) function.
+    // This single call automates the hardware gain/power transition
     es9218p_sabre_lpb2hifitwo(); 
 
+#ifdef CONFIG_MACH_SDM845_JUDY
+    es9218_hph_switch_gpio_H();
+#endif
     return 0;
 }
-
 
 static int es9218p_sabre_amp_stop(struct i2c_client *client, int headset)
 {
@@ -2482,23 +2526,35 @@ static int es9218_aux_harmonic_comp_put_right(struct snd_kcontrol *kcontrol,
 static int es9218_headset_type_get(struct snd_kcontrol *kcontrol,
         struct snd_ctl_elem_value *ucontrol)
 {
-    // Always report High Impedance to the system
-    ucontrol->value.integer.value[0] = 1; 
+    ucontrol->value.integer.value[0] = g_headset_type;
+
+    pr_info("%s(): type = %d \n", __func__, g_headset_type);
+
     return 0;
 }
 
 static int es9218_headset_type_put(struct snd_kcontrol *kcontrol,
         struct snd_ctl_elem_value *ucontrol)
 {
-    // IGNORE the value coming from ucontrol->value.integer.value[0]
-    // We lock it to 1 (High Impedance mode)
-    g_headset_type = 1; 
+    int value = 0;
 
-    pr_info("[QUAD_DAC] FORCED: High Impedance Mode (HiFi2) Active. Ignoring HAL request.\n");
-    
-    // Return 0 so the system thinks the "change" was successful
-    return 0; 
-}
+    value = (int)ucontrol->value.integer.value[0];
+
+    if(value != 0) {
+        g_headset_type = value;
+        pr_info("%s(): type = %d, state = %s\n ", __func__, value, power_state[es9218_power_state]);
+    } else {
+        /*
+         * In mixer_paths.xml, 0 stands for no headset.
+         ** init ** : <ctl name="Es9018 HEADSET TYPE" value="0" />
+         * normal   : <ctl name="Es9018 HEADSET TYPE" value="1" />
+         * advanced : <ctl name="Es9018 HEADSET TYPE" value="2" />
+         * aux      : <ctl name="Es9018 HEADSET TYPE" value="3" />
+        */
+        pr_err("%s() : invalid headset type = %d, state = %s\n", __func__, value, power_state[es9218_power_state]);
+        return 0;
+	}
+
 
     if (es9218_power_state < ESS_PS_HIFI) {
         pr_debug("%s() : invalid state = %s\n", __func__, power_state[es9218_power_state]);
@@ -2717,10 +2773,31 @@ static int es9218_avc_volume_get(struct snd_kcontrol *kcontrol,
     return 0;
 }
 
-static int es9218_avc_volume_put(struct snd_kcontrol *kcontrol, struct snd_ctl_elem_value *ucontrol) {
-    g_avc_volume = 0; // 0dB Analog Reference (Maximum SNR)
-    es9218_write_reg(g_es9218_priv->i2c_client, ES9218P_REG_AVC, avc_vol_tbl[0]);
-    return 0;
+static int es9218_avc_volume_put(struct snd_kcontrol *kcontrol,
+        struct snd_ctl_elem_value *ucontrol)
+{
+    int ret = 0;
+    int vol = 25;
+
+    /* A range of g_avc_volume is from 0 to 24. */
+    vol = (int)ucontrol->value.integer.value[0];
+
+    if (vol >= sizeof(avc_vol_tbl)/sizeof(avc_vol_tbl[0])) {
+        pr_err("%s() : Invalid vol = %d return \n", __func__, vol);
+        return 0;
+    }
+
+    g_avc_volume = vol;
+
+    pr_debug("%s(): AVC Volume= -%d db  state = %s\n", __func__, g_avc_volume , power_state[es9218_power_state]);
+
+    if (es9218_power_state < ESS_PS_HIFI) {
+        pr_debug("%s() : invalid state = %s\n", __func__, power_state[es9218_power_state]);
+        return 0;
+    }
+
+    es9218_set_avc_volume(g_es9218_priv->i2c_client, g_avc_volume);
+    return ret;
 }
 
 static int es9218_master_volume_get(struct snd_kcontrol *kcontrol,
@@ -2732,11 +2809,22 @@ static int es9218_master_volume_get(struct snd_kcontrol *kcontrol,
     return 0;
 }
 
-static int es9218_master_volume_put(struct snd_kcontrol *kcontrol, 
-        struct snd_ctl_elem_value *ucontrol) {
-    g_volume = 0; // 0dB Bit-Perfect Digital Scale
-    es9218_master_trim(g_es9218_priv->i2c_client, 0);
-    return 0;
+static int es9218_master_volume_put(struct snd_kcontrol *kcontrol,
+        struct snd_ctl_elem_value *ucontrol)
+{
+    int ret = 0;
+
+    g_volume = (int)ucontrol->value.integer.value[0];
+    pr_debug("%s(): Master Volume= -%d db\n", __func__, g_volume/2);
+
+
+    if (es9218_power_state < ESS_PS_HIFI) {
+        pr_err("%s() : invalid state = %s\n", __func__, power_state[es9218_power_state]);
+        return 0;
+    }
+
+    es9218_master_trim(g_es9218_priv->i2c_client, g_volume);
+    return ret;
 }
 
 static int es9218_left_volume_get(struct snd_kcontrol *kcontrol,
