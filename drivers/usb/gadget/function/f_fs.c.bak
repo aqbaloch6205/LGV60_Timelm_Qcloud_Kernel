@@ -2198,7 +2198,10 @@ static int ffs_func_eps_enable(struct ffs_function *func)
 		ret = -ENOMEM;
 		goto done;
 	}
+<<<<<<< HEAD
+=======
 
+>>>>>>> fb7c8c0dd114 (Merge remote-tracking branch 'qcom_sm8250/lineage-20' into android16-aptusitu)
 	while (count--) {
 		ep->ep->driver_data = ep;
 
