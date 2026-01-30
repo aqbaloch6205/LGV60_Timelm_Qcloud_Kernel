@@ -45,4 +45,5 @@ static inline bool system_uses_lse_atomics(void) { return false; }
 #define ARM64_LSE_ATOMIC_INSN(llsc, lse)	llsc
 
 #endif	/* CONFIG_ARM64_LSE_ATOMICS */
+
 #endif	/* __ASM_LSE_H */
