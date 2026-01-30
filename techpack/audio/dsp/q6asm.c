@@ -3266,10 +3266,11 @@ static int __q6asm_open_read(struct audio_client *ac,
 			(atomic_read(&ac->cmd_state) >= 0),
 			msecs_to_jiffies(TIMEOUT_MS));
 	if (!rc) {
-		pr_debug("%s: timeout ignored for open read\n", __func__);
-		return 0;
+		. waited for open read\n",
+				__func__);
+		rc = -ETIMEDOUT;
+		goto fail_cmd;
 	}
-
 	if (atomic_read(&ac->cmd_state) > 0) {
 		pr_err("%s: DSP returned error[%s]\n",
 				__func__, adsp_err_get_err_str(
