@@ -65,13 +65,21 @@ cpu_boost_attr_rw(input_boost_ms);
 #ifdef CONFIG_SCHED_CAS
 static unsigned int cas_boost_status = 0;
 static unsigned int cas_feature_enable = 1;
-
 #define store_one_cas(file_name)								\
 static ssize_t store_##file_name								\
 (struct kobject *kobj, struct kobj_attribute *attr,				\
 const char *buf, size_t count)									\
 {																\
+																\
 	sscanf(buf, "%u", &file_name);								\
+	if (cas_feature_enable) {									\
+		if (cas_boost_status != 0) {						 	\
+			schedtune_set_touch_boost(0);						\
+		} else {												\
+			schedtune_set_touch_boost(1);						\
+		}														\
+	}															\
+																\
 	return count;												\
 }
 
@@ -80,9 +88,24 @@ static ssize_t store_##file_name								\
 (struct kobject *kobj, struct kobj_attribute *attr,				\
 const char *buf, size_t count)									\
 {																\
+																\
 	sscanf(buf, "%u", &file_name);								\
+	if (cas_feature_enable == 0) {								\
+		schedtune_set_touch_boost(0);								\
+	} else {													\
+		schedtune_set_touch_boost(1);								\
+	}															\
+																\
 	return count;												\
 }
+
+show_one(cas_boost_status);
+store_one_cas(cas_boost_status);
+cpu_boost_cas_attr_rw(cas_boost_status);
+
+show_one(cas_feature_enable);
+store_one_cas_enable(cas_feature_enable);
+cpu_boost_cas_attr_rw(cas_feature_enable);
 
 #endif /* CONFIG_SCHED_CAS */
 
@@ -383,8 +406,6 @@ static void do_input_boost_multi_step(struct work_struct *work)
 
 	cancel_delayed_work_sync(&input_boost_rem);
 
-/* FIX: Commented out the OPlus CAS boost logic to prevent NULL pointer dereference on LG hardware */
-#if 0
 #ifdef CONFIG_SCHED_CAS
 	if (cas_feature_enable) {
 		if (cas_boost_status == 0 || cas_boost_status == 2) {
@@ -395,7 +416,6 @@ static void do_input_boost_multi_step(struct work_struct *work)
 			schedtune_set_touch_boost(0);
 		}
 	}
-#endif
 #endif
 
 	if (boost_step == 0) {
