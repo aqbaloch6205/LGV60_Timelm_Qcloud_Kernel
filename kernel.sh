@@ -55,7 +55,7 @@ make "${MAKE_ARGS[@]}" $DEFCONFIG
 if [ $KSU_ENABLE -eq 1 ]; then
     echo "KSU is enabled"
     # Exact Xiaomi dev trick: pulling the remote setup logic
-    curl -LSs "https://raw.githubusercontent.com/ApartTUSITU/SukiSU-Ultra/main/kernel/setup.sh" | bash -s ApartTUSITU
+     curl -LSs "https://raw.githubusercontent.com/ReSukiSU/ReSukiSU/main/kernel/setup.sh" | bash -s builtin
     
     echo "Applying SuSFS v2.0.0 Configs..."
     ./scripts/config --file $OUT_DIR/.config \
