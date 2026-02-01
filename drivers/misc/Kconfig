@@ -682,3 +682,9 @@ config PERF_HELPER
 	default n
 	help
 	  this module support record perf lock history and other perf messages
+	  
+config BOOTUP_RECLAIM
+        bool "bootup reclaim"
+        default n
+        help
+          reclaim global memory when bootup	  
