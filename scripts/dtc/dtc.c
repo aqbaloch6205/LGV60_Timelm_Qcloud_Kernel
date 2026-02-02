@@ -8,13 +8,11 @@
 #include "dtc.h"
 #include "srcpos.h"
 
-#define NO_YAML 1
-
 /*
  * Command line options
  */
 int quiet;		/* Level of quietness */
-unsigned int reservenum;/* Number of memory reservation slots */
+int reservenum;		/* Number of memory reservation slots */
 int minsize;		/* Minimum blob size */
 int padsize;		/* Additional padding to blob */
 int alignsize;		/* Additional padding to blob accroding to the alignsize */
@@ -197,7 +195,7 @@ int main(int argc, char *argv[])
 			depname = optarg;
 			break;
 		case 'R':
-			reservenum = strtoul(optarg, NULL, 0);
+			reservenum = strtol(optarg, NULL, 0);
 			break;
 		case 'S':
 			minsize = strtol(optarg, NULL, 0);
