@@ -61,16 +61,13 @@ KBUILD_CFLAGS	+= -mgeneral-regs-only
 KBUILD_CFLAGS	+= $(lseinstr) $(brokengasinst) $(compat_vdso)
 
 ifeq ($(CONFIG_ARCH_KONA), y)
-ifeq ($(cc-name),clang)
-KBUILD_CFLAGS   += -mcpu=cortex-a55
-KBUILD_AFLAGS   += -mcpu=cortex-a55
-ifeq ($(CONFIG_LD_IS_LLD), y)
-KBUILD_LDFLAGS  += -mllvm -mcpu=cortex-a55
-endif
-else
-KBUILD_CFLAGS   += -mcpu=cortex-a77.cortex-a55
-KBUILD_AFLAGS   += -mcpu=cortex-a77.cortex-a55
-endif
+    # Optimized for Snapdragon 865 (A77 + A55)
+    # Using cortex-a77 ensures high performance while maintaining A55 compatibility
+    KBUILD_CFLAGS   += -mcpu=cortex-a77
+    KBUILD_AFLAGS   += -mcpu=cortex-a77
+    ifeq ($(CONFIG_LD_IS_LLD), y)
+        KBUILD_LDFLAGS  += -mllvm -mcpu=cortex-a77
+    endif
 endif
 
 KBUILD_CFLAGS	+= -fno-asynchronous-unwind-tables
