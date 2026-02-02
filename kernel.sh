@@ -72,7 +72,16 @@ if [ $KSU_ENABLE -eq 1 ]; then
         -e KSU_SUSFS_SUS_MAP \
         -e THREAD_INFO_IN_TASK \
         -e KPM \
-        -e PERF_HELPER
+        -e PERF_HELPER \
+        -e XIAOMI_MIUI \
+        -e PACKAGE_RUNTIME_INFO \
+        -e MIGT \
+        -e MILLET \
+        -e PERF_HUMANTASK \
+        -e MIUI_ZRAM_MEMORY_TRACKING \
+        -e ZRAM \
+        -e CRYPTO_LZO \
+        -d DEBUG_FS
 else
     echo "KSU is disabled"
     ./scripts/config --file $OUT_DIR/.config \
