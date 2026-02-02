@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: GPL-2.0
 # scripts/dtc makefile
 
-hostprogs-$(CONFIG_DTC) := dtc
+hostprogs-y	:= dtc
 ifeq ($(DTC_EXT),)
 always		:= $(hostprogs-y)
 endif

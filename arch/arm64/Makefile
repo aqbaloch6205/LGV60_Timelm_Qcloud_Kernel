@@ -144,6 +144,13 @@ KBUILD_IMAGE  := $(boot)/$(KBUILD_IMAGE)
 endif
 
 KBUILD_DTBS	:= dtbs
+<<<<<<< HEAD
+=======
+
+KBUILD_DTBO_IMG := dtbo.img
+
+KBUILD_DTB_IMG := dtb.img
+>>>>>>> parent of 63cfe5eb24f2 (BACKPORT: kbuild: consolidate Devicetree dtb build rules)
 
 ifeq ($(CONFIG_BUILD_ARM64_DT_OVERLAY),y)
 export DTC_FLAGS := -@
