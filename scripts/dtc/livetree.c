@@ -348,7 +348,8 @@ void append_to_property(struct node *node,
 		d = data_append_data(d, data, len);
 		p->val = d;
 	} else {
-		d = data_append_data(empty_data, data, len);
+		d = data_add_marker(empty_data, type, name);
+		d = data_append_data(d, data, len);
 		p = build_property(name, d, NULL);
 		add_property(node, p);
 	}
@@ -633,11 +634,11 @@ cell_t get_node_phandle(struct node *root, struct node *node)
 
 	if (!get_property(node, "linux,phandle")
 	    && (phandle_format & PHANDLE_LEGACY))
-		add_property(node, build_property("linux,phandle", d, NULL));
+		add_property(node, build_property("linux,phandle", d));
 
 	if (!get_property(node, "phandle")
 	    && (phandle_format & PHANDLE_EPAPR))
-		add_property(node, build_property("phandle", d, NULL));
+		add_property(node, build_property("phandle", d));
 
 	/* If the node *does* have a phandle property, we must
 	 * be dealing with a self-referencing phandle, which will be
@@ -872,8 +873,8 @@ static void generate_label_tree_internal(struct dt_info *dti,
 
 			/* insert it */
 			p = build_property(l->label,
-				data_copy_mem(node->fullpath,
-						strlen(node->fullpath) + 1),
+				data_copy_escape_string(node->fullpath,
+						strlen(node->fullpath)),
 				NULL);
 			add_property(an, p);
 		}

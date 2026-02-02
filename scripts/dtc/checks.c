@@ -1084,7 +1084,6 @@ static const struct bus_type spi_bus = {
 
 static void check_spi_bus_bridge(struct check *c, struct dt_info *dti, struct node *node)
 {
-	int spi_addr_cells = 1;
 
 	if (strprefixeq(node->name, node->basenamelen, "spi")) {
 		node->bus = &spi_bus;
@@ -1113,9 +1112,7 @@ static void check_spi_bus_bridge(struct check *c, struct dt_info *dti, struct no
 	if (node->bus != &spi_bus || !node->children)
 		return;
 
-	if (get_property(node, "spi-slave"))
-		spi_addr_cells = 0;
-	if (node_addr_cells(node) != spi_addr_cells)
+	if (node_addr_cells(node) != 1)
 		FAIL(c, dti, node, "incorrect #address-cells for SPI bus");
 	if (node_size_cells(node) != 0)
 		FAIL(c, dti, node, "incorrect #size-cells for SPI bus");
@@ -1132,9 +1129,6 @@ static void check_spi_bus_reg(struct check *c, struct dt_info *dti, struct node 
 	cell_t *cells = NULL;
 
 	if (!node->parent || (node->parent->bus != &spi_bus))
-		return;
-
-	if (get_property(node->parent, "spi-slave"))
 		return;
 
 	prop = get_property(node, "reg");
