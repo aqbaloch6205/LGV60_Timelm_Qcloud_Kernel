@@ -634,11 +634,11 @@ cell_t get_node_phandle(struct node *root, struct node *node)
 
 	if (!get_property(node, "linux,phandle")
 	    && (phandle_format & PHANDLE_LEGACY))
-		add_property(node, build_property("linux,phandle", d));
+		add_property(node, build_property("linux,phandle", d, NULL));
 
 	if (!get_property(node, "phandle")
 	    && (phandle_format & PHANDLE_EPAPR))
-		add_property(node, build_property("phandle", d));
+		add_property(node, build_property("phandle", d, NULL));
 
 	/* If the node *does* have a phandle property, we must
 	 * be dealing with a self-referencing phandle, which will be
