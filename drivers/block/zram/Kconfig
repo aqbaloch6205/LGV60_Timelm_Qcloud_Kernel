@@ -2,7 +2,6 @@
 config ZRAM
 	tristate "Compressed RAM block device support"
 	depends on BLOCK && SYSFS && MMU
-	depends on CRYPTO_LZO || CRYPTO_LZO_RLE || CRYPTO_ZSTD || CRYPTO_LZ4 || CRYPTO_LZ4KD || CRYPTO_LZ4HC || CRYPTO_842 || CRYPTO_DEFLATE
 	select ZSMALLOC
 	select CRYPTO_LZO
 	select CRYPTO_LZO_RLE
@@ -15,9 +14,6 @@ config ZRAM
 	  itself. These disks allow very fast I/O and compression provides
 	  good amounts of memory savings.
 
-	  It has several use cases, for example: /tmp storage, use as swap
-	  disks and maybe many more.
-
 	  See Documentation/blockdev/zram.txt for more information.
 
 choice
@@ -27,7 +23,7 @@ choice
 
 config ZRAM_DEF_COMP_LZORLE
 	bool "lzo-rle"
-	depends on CRYPTO_LZO
+	depends on CRYPTO_LZO_RLE
 
 config ZRAM_DEF_COMP_ZSTD
 	bool "zstd"
@@ -65,7 +61,7 @@ config ZRAM_DEF_COMP
 	default "zstd" if ZRAM_DEF_COMP_ZSTD
 	default "lz4" if ZRAM_DEF_COMP_LZ4
 	default "lz4kd" if ZRAM_DEF_COMP_LZ4KD
-        default "deflate" if ZRAM_DEF_COMP_DEFLATE
+	default "deflate" if ZRAM_DEF_COMP_DEFLATE
 	default "lzo" if ZRAM_DEF_COMP_LZO
 	default "lz4hc" if ZRAM_DEF_COMP_LZ4HC
 	default "842" if ZRAM_DEF_COMP_842
@@ -74,47 +70,17 @@ config ZRAM_DEDUP
 	bool "Deduplication support for ZRAM data"
 	depends on ZRAM
 	default n
-	help
-	  Deduplicate ZRAM data to reduce amount of memory consumption.
-	  Advantage largely depends on the workload. In some cases, this
-          option reduces memory usage to the half. However, if there is no
-	  duplicated data, the amount of memory consumption would be
-	  increased due to additional metadata usage. And, there is
-	  computation time trade-off. Please check the benefit before
-	  enabling this option. Experiment shows the positive effect when
-	  the zram is used as blockdev and is used to store build output.
 
 config ZRAM_WRITEBACK
        bool "Write back incompressible or idle page to backing device"
        depends on ZRAM
        default n
-       help
-	 With incompressible page, there is no memory saving to keep it
-	 in memory. Instead, write it out to backing device.
-	 For this feature, admin should set up backing device via
-	 /sys/block/zramX/backing_dev.
-
-	 With /sys/block/zramX/{idle,writeback}, application could ask
-	 idle page's writeback to the backing device to save in memory.
-
-	 See Documentation/blockdev/zram.txt for more information.
 
 config ZRAM_MEMORY_TRACKING
 	bool "Track zRam block status"
 	depends on ZRAM && DEBUG_FS
-	help
-	  With this feature, admin can track the state of allocated blocks
-	  of zRAM. Admin could see the information via
-	  /sys/kernel/debug/zram/zramX/block_state.
-
-	  See Documentation/blockdev/zram.txt for more information.
 
 config MIUI_ZRAM_MEMORY_TRACKING
 	bool "Track zRam stats"
 	depends on ZRAM
-	help
-	  With this feature, admin can track the state of zram
-	  of zRAM. Admin could see the information via
-	  /sys/block/zramX/.
-
-	  See Documentation/blockdev/zram.txt for more information.
+	

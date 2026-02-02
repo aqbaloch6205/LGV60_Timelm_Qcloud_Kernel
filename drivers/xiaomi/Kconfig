@@ -4,56 +4,57 @@ config XIAOMI_MIUI
 	help
 	  Enables compilation of Xiaomi MIUI specific vendor additions
 
-	  Say Y if you want to compile the Xiaomi MIUI specific kernel modifications.
-	  Say N if you want to discard the Xiaomi MIUI specific kernel modifications.
+	  [span_2](start_span)Say Y if you want to compile the Xiaomi MIUI specific kernel modifications.[span_2](end_span)
+	  [span_3](start_span)Say N if you want to discard the Xiaomi MIUI specific kernel modifications.[span_3](end_span)
 
 if XIAOMI_MIUI
 
 config PACKAGE_RUNTIME_INFO
 	bool "Show package runtime info on cluster"
 	help
-	  This option can show package runtime info in sup/big/little core.
+	  [span_4](start_span)This option can show package runtime info in sup/big/little core.[span_4](end_span)
 
 config MIGT
 	bool "Boost cpufreq during high load"
 	depends on PACKAGE_RUNTIME_INFO
 	help
-	  Boost cpufreq when current frame drawing time too long
+	  [span_5](start_span)Boost cpufreq when current frame drawing time too long[span_5](end_span)
 
 config MILLET
 	bool "MIUI frozen framework"
 	depends on PACKAGE_RUNTIME_INFO
 	help
-	  MIUI frozen function
+	  [span_6](start_span)MIUI frozen function[span_6](end_span)
 
 config MIGT_ENERGY_MODEL
 	bool "DT-based Energy Model for CPU and GPU"
 	depends on MIGT
 	help
 	  This mod rely on Energy Models (EMs) statically defined in
-	  the Device Tree.
+	  [span_7](start_span)the Device Tree.[span_7](end_span)
 
 config PERF_HUMANTASK
 	bool "Enable MIUI humantask performance feature"
 	help
-	  This option adds support to switch on/off the sched humantask.
+	  [span_8](start_span)This option adds support to switch on/off the sched humantask.[span_8](end_span)
 
 config PERF_CRITICAL_RT_TASK
 	bool "Enable set rt binder thread" if EXPERT
 	help
 	  This option speeds ui feature by setting BlastBufferQueue binder
-	  thread to FIFO.
+	  [span_9](start_span)thread to FIFO.[span_9](end_span)
 
 config SF_BINDER
 	bool "Enable surfaceflinger binder thread" if EXPERT
 	help
-	  Xiaomi restore surfaceflinger binder priority FIFO
+	  [span_10](start_span)Xiaomi restore surfaceflinger binder priority FIFO[span_10](end_span)
 
 config MIUI_ZRAM_MEMORY_TRACKING
 	bool "Track zRam stats"
 	depends on ZRAM
 	help
-	  With this feature, admin can track the state of zram.
+	  With this feature, admin can track the state of zram via
+	  [span_11](start_span)/sys/block/zramX/.[span_11](end_span)
 
 source "drivers/xiaomi/fragmention/Kconfig"
 
