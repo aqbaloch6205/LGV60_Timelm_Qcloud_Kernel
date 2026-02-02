@@ -1,5 +1,3 @@
-menu "Xiaomi MIUI additions"
-
 config XIAOMI_MIUI
 	bool "Enable Xiaomi MIUI modifications"
 	depends on BOARD_XIAOMI
@@ -33,8 +31,7 @@ config MIGT_ENERGY_MODEL
 	depends on MIGT
 	help
 	  This mod rely on Energy Models (EMs) statically defined in
-	  the Device Tree. Since EAS now uses only the active costs of CPUs,
-	  the cluster-related costs and idle-costs are ignored.
+	  the Device Tree.
 
 config PERF_HUMANTASK
 	bool "Enable MIUI humantask performance feature"
@@ -56,14 +53,8 @@ config MIUI_ZRAM_MEMORY_TRACKING
 	bool "Track zRam stats"
 	depends on ZRAM
 	help
-	  With this feature, admin can track the state of zram
-	  of zRAM. Admin could see the information via
-	  /sys/block/zramX/.
-
-	  See Documentation/blockdev/zram.txt for more information.
+	  With this feature, admin can track the state of zram.
 
 source "drivers/xiaomi/fragmention/Kconfig"
 
 endif
-
-endmenu
