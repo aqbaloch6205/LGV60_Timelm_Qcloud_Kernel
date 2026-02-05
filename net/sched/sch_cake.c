@@ -1654,7 +1654,6 @@ static s32 cake_enqueue(struct sk_buff *skb, struct Qdisc *sch,
 	ktime_t now = ktime_get();
 	struct cake_tin_data *b;
 	struct cake_flow *flow;
-	u32 idx;
 	bool same_flow = false;
 
 	/* choose flow to insert into */
