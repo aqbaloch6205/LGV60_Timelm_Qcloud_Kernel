@@ -58,6 +58,7 @@ struct f2fs_attr {
 			 const char *buf, size_t len);
 	int struct_type;
 	int offset;
+	int size;
 	int id;
 };
 
@@ -280,11 +281,30 @@ static ssize_t main_blkaddr_show(struct f2fs_attr *a,
 			(unsigned long long)MAIN_BLKADDR(sbi));
 }
 
+static ssize_t __sbi_show_value(struct f2fs_attr *a,
+		struct f2fs_sb_info *sbi, char *buf,
+		unsigned char *value)
+{
+	switch (a->size) {
+	case 1:
+		return sysfs_emit(buf, "%u\n", *(u8 *)value);
+	case 2:
+		return sysfs_emit(buf, "%u\n", *(u16 *)value);
+	case 4:
+		return sysfs_emit(buf, "%u\n", *(u32 *)value);
+	case 8:
+		return sysfs_emit(buf, "%llu\n", *(u64 *)value);
+	default:
+		f2fs_bug_on(sbi, 1);
+		return sysfs_emit(buf,
+				"show sysfs node value with wrong type\n");
+	}
+}
+
 static ssize_t f2fs_sbi_show(struct f2fs_attr *a,
 			struct f2fs_sb_info *sbi, char *buf)
 {
 	unsigned char *ptr = NULL;
-	unsigned int *ui;
 
 	ptr = __struct_ptr(sbi, a->struct_type);
 	if (!ptr)
@@ -311,68 +331,30 @@ static ssize_t f2fs_sbi_show(struct f2fs_attr *a,
 		return len;
 	}
 
-	if (!strcmp(a->attr.name, "ckpt_thread_ioprio")) {
-		struct ckpt_req_control *cprc = &sbi->cprc_info;
-		int len = 0;
-		int class = IOPRIO_PRIO_CLASS(cprc->ckpt_thread_ioprio);
-		int data = IOPRIO_PRIO_DATA(cprc->ckpt_thread_ioprio);
+	return __sbi_show_value(a, sbi, buf, ptr + a->offset);
+}
 
-		if (class == IOPRIO_CLASS_RT)
-			len += scnprintf(buf + len, PAGE_SIZE - len, "rt,");
-		else if (class == IOPRIO_CLASS_BE)
-			len += scnprintf(buf + len, PAGE_SIZE - len, "be,");
-		else
-			return -EINVAL;
-
-		len += scnprintf(buf + len, PAGE_SIZE - len, "%d\n", data);
-		return len;
+static void __sbi_store_value(struct f2fs_attr *a,
+			struct f2fs_sb_info *sbi,
+			unsigned char *ui, unsigned long value)
+{
+	switch (a->size) {
+	case 1:
+		*(u8 *)ui = value;
+		break;
+	case 2:
+		*(u16 *)ui = value;
+		break;
+	case 4:
+		*(u32 *)ui = value;
+		break;
+	case 8:
+		*(u64 *)ui = value;
+		break;
+	default:
+		f2fs_bug_on(sbi, 1);
+		f2fs_msg(sbi->sb, KERN_ERR, "store sysfs node value with wrong type");
 	}
-
-#ifdef CONFIG_F2FS_FS_COMPRESSION
-	if (!strcmp(a->attr.name, "compr_written_block"))
-		return snprintf(buf, PAGE_SIZE, "%llu\n",
-						sbi->compr_written_block);
-
-	if (!strcmp(a->attr.name, "compr_saved_block"))
-		return snprintf(buf, PAGE_SIZE, "%llu\n",
-						sbi->compr_saved_block);
-
-	if (!strcmp(a->attr.name, "compr_new_inode"))
-		return snprintf(buf, PAGE_SIZE, "%u\n",
-						sbi->compr_new_inode);
-#endif
-
-	if (!strcmp(a->attr.name, "gc_urgent"))
-		return snprintf(buf, PAGE_SIZE, "%s\n",
-				gc_mode_names[sbi->gc_mode]);
-
-	if (!strcmp(a->attr.name, "gc_reclaimed_segments")) {
-		return snprintf(buf, PAGE_SIZE, "%u\n",
-			sbi->gc_reclaimed_segs[sbi->gc_segment_mode]);
-	}
-
-	if (!strcmp(a->attr.name, "current_atomic_write")) {
-		s64 current_write = atomic64_read(&sbi->current_atomic_write);
-
-		return snprintf(buf, PAGE_SIZE, "%lld\n",
-			current_write);
-	}
-
-	if (!strcmp(a->attr.name, "peak_atomic_write"))
-		return snprintf(buf, PAGE_SIZE, "%lld\n",
-			sbi->peak_atomic_write);
-
-	if (!strcmp(a->attr.name, "committed_atomic_block"))
-		return snprintf(buf, PAGE_SIZE, "%llu\n",
-			sbi->committed_atomic_block);
-
-	if (!strcmp(a->attr.name, "revoked_atomic_block"))
-		return snprintf(buf, PAGE_SIZE, "%llu\n",
-			sbi->revoked_atomic_block);
-
-	ui = (unsigned int *)(ptr + a->offset);
-
-	return sprintf(buf, "%u\n", *ui);
 }
 
 static ssize_t __sbi_store(struct f2fs_attr *a,
@@ -570,133 +552,7 @@ out:
 		return count;
 	}
 
-	if (!strcmp(a->attr.name, "iostat_period_ms")) {
-		if (t < MIN_IOSTAT_PERIOD_MS || t > MAX_IOSTAT_PERIOD_MS)
-			return -EINVAL;
-		spin_lock(&sbi->iostat_lock);
-		sbi->iostat_period_ms = (unsigned int)t;
-		spin_unlock(&sbi->iostat_lock);
-		return count;
-	}
-#endif
-
-#ifdef CONFIG_F2FS_FS_COMPRESSION
-	if (!strcmp(a->attr.name, "compr_written_block") ||
-		!strcmp(a->attr.name, "compr_saved_block")) {
-		if (t != 0)
-			return -EINVAL;
-		sbi->compr_written_block = 0;
-		sbi->compr_saved_block = 0;
-		return count;
-	}
-
-	if (!strcmp(a->attr.name, "compr_new_inode")) {
-		if (t != 0)
-			return -EINVAL;
-		sbi->compr_new_inode = 0;
-		return count;
-	}
-#endif
-
-	if (!strcmp(a->attr.name, "atgc_candidate_ratio")) {
-		if (t > 100)
-			return -EINVAL;
-		sbi->am.candidate_ratio = t;
-		return count;
-	}
-
-	if (!strcmp(a->attr.name, "atgc_age_weight")) {
-		if (t > 100)
-			return -EINVAL;
-		sbi->am.age_weight = t;
-		return count;
-	}
-
-	if (!strcmp(a->attr.name, "gc_segment_mode")) {
-		if (t < MAX_GC_MODE)
-			sbi->gc_segment_mode = t;
-		else
-			return -EINVAL;
-		return count;
-	}
-
-	if (!strcmp(a->attr.name, "gc_reclaimed_segments")) {
-		if (t != 0)
-			return -EINVAL;
-		sbi->gc_reclaimed_segs[sbi->gc_segment_mode] = 0;
-		return count;
-	}
-
-	if (!strcmp(a->attr.name, "max_fragment_chunk")) {
-		if (t >= MIN_FRAGMENT_SIZE && t <= MAX_FRAGMENT_SIZE)
-			sbi->max_fragment_chunk = t;
-		else
-			return -EINVAL;
-		return count;
-	}
-
-	if (!strcmp(a->attr.name, "max_fragment_hole")) {
-		if (t >= MIN_FRAGMENT_SIZE && t <= MAX_FRAGMENT_SIZE)
-			sbi->max_fragment_hole = t;
-		else
-			return -EINVAL;
-		return count;
-	}
-
-	if (!strcmp(a->attr.name, "peak_atomic_write")) {
-		if (t != 0)
-			return -EINVAL;
-		sbi->peak_atomic_write = 0;
-		return count;
-	}
-
-	if (!strcmp(a->attr.name, "committed_atomic_block")) {
-		if (t != 0)
-			return -EINVAL;
-		sbi->committed_atomic_block = 0;
-		return count;
-	}
-
-	if (!strcmp(a->attr.name, "revoked_atomic_block")) {
-		if (t != 0)
-			return -EINVAL;
-		sbi->revoked_atomic_block = 0;
-		return count;
-	}
-
-	if (!strcmp(a->attr.name, "readdir_ra")) {
-		sbi->readdir_ra = !!t;
-		return count;
-	}
-
-	if (!strcmp(a->attr.name, "hot_data_age_threshold")) {
-		if (t == 0 || t >= sbi->warm_data_age_threshold)
-			return -EINVAL;
-		if (t == *ui)
-			return count;
-		*ui = (unsigned int)t;
-		return count;
-	}
-
-	if (!strcmp(a->attr.name, "warm_data_age_threshold")) {
-		if (t == 0 || t <= sbi->hot_data_age_threshold)
-			return -EINVAL;
-		if (t == *ui)
-			return count;
-		*ui = (unsigned int)t;
-		return count;
-	}
-
-	if (!strcmp(a->attr.name, "last_age_weight")) {
-		if (t > 100)
-			return -EINVAL;
-		if (t == *ui)
-			return count;
-		*ui = (unsigned int)t;
-		return count;
-	}
-
-	*ui = (unsigned int)t;
+	__sbi_store_value(a, sbi, ptr + a->offset, t);
 
 	return count;
 }
@@ -792,13 +648,14 @@ static struct f2fs_attr f2fs_attr_sb_##_name = {		\
 	.id	= F2FS_FEATURE_##_feat,				\
 }
 
-#define F2FS_ATTR_OFFSET(_struct_type, _name, _mode, _show, _store, _offset) \
+#define F2FS_ATTR_OFFSET(_struct_type, _name, _mode, _show, _store, _offset, _size) \
 static struct f2fs_attr f2fs_attr_##_name = {			\
 	.attr = {.name = __stringify(_name), .mode = _mode },	\
 	.show	= _show,					\
 	.store	= _store,					\
 	.struct_type = _struct_type,				\
-	.offset = _offset					\
+	.offset = _offset,					\
+	.size = _size						\
 }
 
 #define F2FS_RO_ATTR(struct_type, struct_name, name, elname)	\
@@ -809,7 +666,8 @@ static struct f2fs_attr f2fs_attr_##_name = {			\
 #define F2FS_RW_ATTR(struct_type, struct_name, name, elname)	\
 	F2FS_ATTR_OFFSET(struct_type, name, 0644,		\
 		f2fs_sbi_show, f2fs_sbi_store,			\
-		offsetof(struct struct_name, elname))
+		offsetof(struct struct_name, elname),		\
+		sizeof_field(struct struct_name, elname))
 
 #define F2FS_GENERAL_RO_ATTR(name) \
 static struct f2fs_attr f2fs_attr_##name = __ATTR(name, 0444, name##_show, NULL)
