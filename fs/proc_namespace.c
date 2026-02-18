@@ -16,7 +16,6 @@
 #include <linux/susfs_def.h>
 #endif
 
-
 #include "proc/internal.h" /* only for get_proc_task() in ->open() */
 
 #include "pnode.h"
@@ -26,7 +25,6 @@
 extern bool susfs_hide_sus_mnts_for_non_su_procs;
 extern bool susfs_is_current_ksu_domain(void);
 #endif
-
 
 static __poll_t mounts_poll(struct file *file, poll_table *wait)
 {
@@ -98,7 +96,7 @@ static inline void mangle(struct seq_file *m, const char *s)
 static void show_type(struct seq_file *m, struct super_block *sb)
 {
 	mangle(m, sb->s_type->name);
-	if (sb->s_subtype && sb->s_subtype[0]) {
+	if (sb->s_subtype) {
 		seq_putc(m, '.');
 		mangle(m, sb->s_subtype);
 	}
@@ -141,7 +139,7 @@ static int show_vfsmnt(struct seq_file *m, struct vfsmount *mnt)
 		goto out;
 	show_mnt_opts(m, mnt);
 	if (sb->s_op->show_options2)
-			err = sb->s_op->show_options2(mnt, m, mnt_path.dentry);
+		err = sb->s_op->show_options2(mnt, m, mnt_path.dentry);
 	else if (sb->s_op->show_options)
 		err = sb->s_op->show_options(m, mnt_path.dentry);
 	seq_puts(m, " 0 0\n");
@@ -165,7 +163,6 @@ static int show_mountinfo(struct seq_file *m, struct vfsmount *mnt)
 		return 0;
 	}
 #endif
-
 
 	seq_printf(m, "%i %i %u:%u ", r->mnt_id, r->mnt_parent->mnt_id,
 		   MAJOR(sb->s_dev), MINOR(sb->s_dev));
@@ -239,7 +236,6 @@ static int show_vfsstat(struct seq_file *m, struct vfsmount *mnt)
 		return 0;
 	}
 #endif
-
 
 	/* device */
 	if (sb->s_op->show_devname) {
