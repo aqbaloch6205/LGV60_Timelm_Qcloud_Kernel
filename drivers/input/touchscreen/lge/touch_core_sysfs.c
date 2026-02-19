@@ -246,50 +246,6 @@ static ssize_t store_lpwg_notify(struct device *dev,
 	return count;
 }
 
-/* 1. Define the status variable */
-int tap2wake_status = 0;
-
-/* 2. Define the SHOW function (Fixes the "undeclared identifier" error) */
-static ssize_t show_tap2wake(struct device *dev, char *buf)
-{
-	return scnprintf(buf, PAGE_SIZE, "%d\n", tap2wake_status);
-}
-
-/* 3. Define the STORE function (Your logic for HyperOS/AOD) */
-static ssize_t store_tap2wake(struct device *dev,
-		const char *buf, size_t count)
-{
-	struct touch_core_data *ts = to_touch_core(dev);
-	int status = 0;
-	int tap2wake_params[4] = { 0, 1, 1, 0 }; // LGE standard gesture parameters
-
-	if (sscanf(buf, "%d", &status) <= 0)
-		return -EINVAL;
-
-	if (status < 0 || status > 1) {
-		TOUCH_E("invalid tap2wake status(%d)\n", status);
-		return -EINVAL;
-	}
-
-	tap2wake_status = status;
-
-	/* FIX: This section pushes the setting to the hardware immediately */
-	if (ts->driver->lpwg) {
-		tap2wake_params[0] = tap2wake_status; // Set the enable bit
-		
-		mutex_lock(&ts->lock);
-		TOUCH_I("Tap2Wake manually updated: %s\n", (tap2wake_status) ? "ON" : "OFF");
-		
-		/* LPWG_MASTER is the key for AOD/Lockscreen persistence */
-		ts->driver->lpwg(ts->dev, LPWG_MASTER, tap2wake_params);
-		lpwg_status = tap2wake_status; 
-		
-		mutex_unlock(&ts->lock);
-	}
-
-	return count;
-}
-
 static ssize_t show_lockscreen_state(struct device *dev, char *buf)
 {
 	struct touch_core_data *ts = to_touch_core(dev);
@@ -1696,8 +1652,7 @@ static ssize_t write_app_fw_upgrade(struct file *filp,
 static TOUCH_ATTR(platform_data, show_platform_data, NULL);
 static TOUCH_ATTR(fw_upgrade, show_upgrade, store_upgrade);
 static TOUCH_ATTR(lpwg_data, show_lpwg_data, store_lpwg_data);
-static TOUCH_ATTR(lpwg_notify, show_lpwg_notify, store_lpwg_notify);
-static TOUCH_ATTR(tap2wake, show_tap2wake, store_tap2wake);
+static TOUCH_ATTR(lpwg_notify, NULL, store_lpwg_notify);
 static TOUCH_ATTR(keyguard,
 	show_lockscreen_state, store_lockscreen_state);
 static TOUCH_ATTR(ime_status, show_ime_state, store_ime_state);
@@ -1751,7 +1706,6 @@ static struct attribute *touch_attribute_list[] = {
 	&touch_attr_fw_upgrade.attr,
 	&touch_attr_lpwg_data.attr,
 	&touch_attr_lpwg_notify.attr,
-	&touch_attr_tap2wake.attr,
 	&touch_attr_keyguard.attr,
 	&touch_attr_ime_status.attr,
 	&touch_attr_film_status.attr,
