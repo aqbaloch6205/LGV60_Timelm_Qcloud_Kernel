@@ -337,8 +337,6 @@ enum {
 	TOUCH_UEVENT_SWIPE_UP,
 	TOUCH_UEVENT_SWIPE_LEFT,
 	TOUCH_UEVENT_SWIPE_RIGHT,
-	TOUCH_UEVENT_SWIPE_LEFT2,
-	TOUCH_UEVENT_SWIPE_RIGHT2,
 	TOUCH_UEVENT_WATER_MODE_ON,
 	TOUCH_UEVENT_WATER_MODE_OFF,
 	TOUCH_UEVENT_AI_BUTTON,
@@ -361,15 +359,8 @@ enum {
 	DS_UPDATE_CONNECT	= 1,
 	DS_UPDATE_CUSTOM	= 2,
 };
-
-enum {
-	KEY_GESTURE_SWIPE_DOWN = 247,
-	KEY_GESTURE_SWIPE_UP = 248,
-	KEY_GESTURE_SWIPE_RIGHT = 249,
-	KEY_GESTURE_SWIPE_LEFT = 250,
-	KEY_GESTURE_SWIPE_RIGHT2 = 251,
-	KEY_GESTURE_SWIPE_LEFT2 = 252,
-};
+/* use TOUCH_UEVENT_SIDE_PAY instead of TOUCH_UEVENT_SWIPE_LEFT2/RIGHT2 */
+#define TOUCH_UEVENT_SIDE_PAY (TOUCH_UEVENT_SWIPE_UP)
 
 enum {
 	APP_HOME = 0,
@@ -509,7 +500,6 @@ struct swipe_ctrl {
 	struct swipe_active_area start_area;
 	struct swipe_active_area border_area;
 	struct swipe_active_area start_border_area;
-	bool available;
 };
 
 struct touch_pinctrl {
