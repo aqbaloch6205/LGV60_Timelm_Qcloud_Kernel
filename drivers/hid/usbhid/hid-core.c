@@ -1253,6 +1253,7 @@ static int usbhid_parse(struct hid_device *hid)
 		 * so we can safely recompute the proper field.
 		 */
 		if (hdesc->bLength >= sizeof(*hdesc)) {
+		if (hdesc->bLength >= sizeof(*hdesc)) {
 			int fixed_opt_descriptors_size = hdesc->bLength - sizeof(*hdesc);
 
 			hid_warn(intf, "fixing wrong optional hid class descriptors count\n");
