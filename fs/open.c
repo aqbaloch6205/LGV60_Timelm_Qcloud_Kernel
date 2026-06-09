@@ -371,7 +371,7 @@ SYSCALL_DEFINE4(fallocate, int, fd, int, mode, loff_t, offset, loff_t, len)
  * switching the fsuid/fsgid around to the real ones.
  */
 #ifdef CONFIG_KSU_SUSFS
-extern bool ksu_su_compat_enabled __read_mostly;
+extern struct static_key_true ksu_su_compat_enabled;
 extern bool __ksu_is_allow_uid_for_current(uid_t uid);
 extern int ksu_handle_faccessat(int *dfd, const char __user **filename_user, int *mode,
 			int *flags);
@@ -387,12 +387,11 @@ long do_faccessat(int dfd, const char __user *filename, int mode)
 	unsigned int lookup_flags = LOOKUP_FOLLOW;
 
 #ifdef CONFIG_KSU_SUSFS
-    if (likely(susfs_is_current_proc_umounted()) || !ksu_su_compat_enabled) {
-        goto orig_flow;
-    }
-
-	if (unlikely(__ksu_is_allow_uid_for_current(current_uid().val))) {
-		ksu_handle_faccessat(&dfd, &filename, &mode, NULL);
+	if (likely(susfs_is_current_proc_umounted()))
+		goto orig_flow;
+	if (static_branch_likely(&ksu_su_compat_enabled))
+		if (unlikely(__ksu_is_allow_uid_for_current(current_uid().val))) {
+			ksu_handle_faccessat(&dfd, &filename, &mode, NULL);
 	}
 
 orig_flow:
