@@ -34,6 +34,12 @@ rm -rf $OUT_DIR $ANYKERNEL_DIR *.zip
 echo "Cloning AnyKernel3..."
 git clone https://github.com/aqbaloch6205/AnyKernel3 -b kona --single-branch --depth=1 $ANYKERNEL_DIR
 
+# --- FIX: Dynamically strip out the invalid dot-syntax in the Makefile ---
+echo "Patching arch/arm64/Makefile target options for ZyC-Clang 16..."
+if [ -f "arch/arm64/Makefile" ]; then
+    sed -i 's/cortex-a77.cortex-a55/cortex-a77/g' arch/arm64/Makefile
+fi
+
 echo "Starting Build for Jhat-Pat (KSU=$KSU_ENABLE)..."
 
 # --- FIXED SECTION: Explicit LLVM tool mapping for ZyC-Clang 16 ---
@@ -88,7 +94,6 @@ else
         -d KSU \
         -e PERF_HELPER
 fi
-
 
 # 3. Compile Kernel
 make "${MAKE_ARGS[@]}" -j$(nproc)
