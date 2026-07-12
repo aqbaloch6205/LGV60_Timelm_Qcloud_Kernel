@@ -36,15 +36,24 @@ git clone https://github.com/aqbaloch6205/AnyKernel3 -b kona --single-branch --d
 
 echo "Starting Build for Jhat-Pat (KSU=$KSU_ENABLE)..."
 
-# --- FIXED SECTION: Using Array to handle quotes correctly ---
+# --- FIXED SECTION: Explicit LLVM tool mapping for ZyC-Clang 16 ---
 MAKE_ARGS=(
     O="$OUT_DIR"
     ARCH=arm64
     CC=clang
+    HOSTCC=clang
+    CLANG_TRIPLE=aarch64-linux-gnu-
     CROSS_COMPILE=aarch64-linux-gnu-
     CROSS_COMPILE_ARM32=arm-linux-gnueabi-
+    CROSS_COMPILE_COMPAT=arm-linux-gnueabi-
     LLVM=1
     LLVM_IAS=1
+    LD=ld.lld
+    AR=llvm-ar
+    NM=llvm-nm
+    OBJCOPY=llvm-objcopy
+    OBJDUMP=llvm-objdump
+    STRIP=llvm-strip
     KCFLAGS="-Wno-error -Wno-error=incompatible-pointer-types"
 )
 
@@ -55,7 +64,7 @@ make "${MAKE_ARGS[@]}" $DEFCONFIG
 if [ $KSU_ENABLE -eq 1 ]; then
     echo "KSU is enabled"
     # Exact Xiaomi dev trick: pulling the remote setup logic
-     curl -LSs "https://raw.githubusercontent.com/ReSukiSU/ReSukiSU/main/kernel/setup.sh" | bash -s builtin
+    curl -LSs "https://raw.githubusercontent.com/ReSukiSU/ReSukiSU/main/kernel/setup.sh" | bash -s builtin
     
     echo "Applying SuSFS v2.0.0 Configs..."
     ./scripts/config --file $OUT_DIR/.config \
