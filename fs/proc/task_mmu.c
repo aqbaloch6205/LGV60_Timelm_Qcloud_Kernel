@@ -21,10 +21,12 @@
 #include <linux/pkeys.h>
 #include <linux/mm_inline.h>
 #include <linux/ctype.h>
-#if defined(CONFIG_KSU_SUSFS_SUS_KSTAT) || defined(CONFIG_KSU_SUSFS_SUS_MAP) || defined(CONFIG_KSU_SUSFS_OPEN_REDIRECT)
+#if defined(CONFIG_KSU_SUSFS_SUS_KSTAT) || defined(CONFIG_KSU_SUSFS_SUS_MAP)
 #include <linux/susfs_def.h>
-#endif // #if defined(CONFIG_KSU_SUSFS_SUS_KSTAT) || defined(CONFIG_KSU_SUSFS_SUS_MAP) || defined(CONFIG_KSU_SUSFS_OPEN_REDIRECT)
+#endif
 
+
+ 
 #include <asm/elf.h>
 #include <asm/tlb.h>
 #include <asm/tlbflush.h>
@@ -183,7 +185,7 @@ static void vma_stop(struct proc_maps_private *priv)
 	struct mm_struct *mm = priv->mm;
 
 	release_task_mempolicy(priv);
-	mmap_read_unlock(mm);
+	up_read(&mm->mmap_sem);
 	mmput(mm);
 }
 
@@ -221,7 +223,7 @@ static void *m_start(struct seq_file *m, loff_t *ppos)
 	if (!mm || !mmget_not_zero(mm))
 		return NULL;
 
-	if (mmap_read_lock_killable(mm)) {
+	if (down_read_killable(&mm->mmap_sem)) {
 		mmput(mm);
 		return ERR_PTR(-EINTR);
 	}
@@ -352,11 +354,9 @@ static void show_vma_header_prefix(struct seq_file *m,
 }
 
 #ifdef CONFIG_KSU_SUSFS_SUS_KSTAT
-extern void susfs_sus_kstat_spoof_show_map_vma(struct inode *inode, dev_t *out_dev, unsigned long *out_ino);
-#endif // #ifdef CONFIG_KSU_SUSFS_SUS_KSTAT
-#ifdef CONFIG_KSU_SUSFS_OPEN_REDIRECT
-extern int susfs_open_redirect_spoof_show_map_vma(struct inode *inode, unsigned long *out_ino, dev_t *out_dev, char *spoofed_name);
-#endif // #ifdef CONFIG_KSU_SUSFS_OPEN_REDIRECT
+extern void susfs_sus_ino_for_show_map_vma(unsigned long ino, dev_t *out_dev, unsigned long *out_ino);
+#endif
+
 
 static void
 show_map_vma(struct seq_file *m, struct vm_area_struct *vma)
@@ -369,54 +369,52 @@ show_map_vma(struct seq_file *m, struct vm_area_struct *vma)
 	unsigned long start, end;
 	dev_t dev = 0;
 	const char *name = NULL;
-#ifdef CONFIG_KSU_SUSFS_OPEN_REDIRECT
-	char *spoofed_redirected_name = NULL;
-#endif // #ifdef CONFIG_KSU_SUSFS_OPEN_REDIRECT
+
 
 	if (file) {
 		struct inode *inode = file_inode(vma->vm_file);
-#ifdef CONFIG_KSU_SUSFS_OPEN_REDIRECT
-		if (SUSFS_IS_INODE_OPEN_REDIRECT(inode)) {
-			if (!susfs_open_redirect_spoof_show_map_vma(inode, &ino, &dev, spoofed_redirected_name)) {
-				pgoff = ((loff_t)vma->vm_pgoff) << PAGE_SHIFT;
-				goto orig_flow;
-			}
-		}
-#endif // #ifdef CONFIG_KSU_SUSFS_OPEN_REDIRECT
 #ifdef CONFIG_KSU_SUSFS_SUS_MAP
-		if (SUSFS_IS_INODE_SUS_MAP(inode))
-			return;
-#endif // #ifdef CONFIG_KSU_SUSFS_SUS_MAP
+		if (unlikely(inode->i_mapping->flags & BIT_SUS_MAPS) && susfs_is_current_proc_umounted()) {
+			seq_setwidth(m, 25 + sizeof(void *) * 6 - 1);
+			seq_put_hex_ll(m, NULL, vma->vm_start, 8);
+			seq_put_hex_ll(m, "-", vma->vm_end, 8);
+			seq_putc(m, ' ');
+			seq_putc(m, '-');
+			seq_putc(m, '-');
+			seq_putc(m, '-');
+			seq_putc(m, 'p');
+			seq_put_hex_ll(m, " ", pgoff, 8);
+			seq_put_hex_ll(m, " ", MAJOR(dev), 2);
+			seq_put_hex_ll(m, ":", MINOR(dev), 2);
+			seq_put_decimal_ull(m, " ", ino);
+			seq_putc(m, ' ');
+			goto done;
+		}
+#endif
+#ifdef CONFIG_KSU_SUSFS_SUS_KSTAT
+		if (unlikely(inode->i_mapping->flags & BIT_SUS_KSTAT)) {
+			susfs_sus_ino_for_show_map_vma(inode->i_ino, &dev, &ino);
+			goto bypass_orig_flow;
+		}
+#endif
 		dev = inode->i_sb->s_dev;
 		ino = inode->i_ino;
-		pgoff = ((loff_t)vma->vm_pgoff) << PAGE_SHIFT;
 #ifdef CONFIG_KSU_SUSFS_SUS_KSTAT
-		susfs_sus_kstat_spoof_show_map_vma(inode, &dev, &ino);
-#endif // #ifdef CONFIG_KSU_SUSFS_SUS_KSTAT
+bypass_orig_flow:
+#endif
+		pgoff = ((loff_t)vma->vm_pgoff) << PAGE_SHIFT;
+
 	}
 
-#ifdef CONFIG_KSU_SUSFS_OPEN_REDIRECT
-orig_flow:
-#endif // #ifdef CONFIG_KSU_SUSFS_OPEN_REDIRECT
 	start = vma->vm_start;
 	end = vma->vm_end;
 	show_vma_header_prefix(m, start, end, flags, pgoff, dev, ino);
+
 
 	/*
 	 * Print the dentry name for named mappings, and a
 	 * special [heap] marker for the heap:
 	 */
-
-#ifdef CONFIG_KSU_SUSFS_OPEN_REDIRECT
-	if (spoofed_redirected_name) {
-		seq_pad(m, ' ');
-		seq_puts(m, spoofed_redirected_name);
-		seq_putc(m, '\n');
-		kfree(spoofed_redirected_name);
-		return;
-	}
-#endif // #ifdef CONFIG_KSU_SUSFS_OPEN_REDIRECT
-
 	if (file) {
 		seq_pad(m, ' ');
 		seq_file_path(m, file, "\n");
@@ -500,9 +498,9 @@ const struct file_operations proc_pid_maps_operations = {
  * PSS_SHIFT) would be the real byte count.
  *
  * A shift of 12 before division means (assuming 4K page size):
- * 	- 1M 3-user-pages add up to 8KB errors;
- * 	- supports mapcount up to 2^24, or 16M;
- * 	- supports PSS up to 2^52 bytes, or 4PB.
+ * - 1M 3-user-pages add up to 8KB errors;
+ * - supports mapcount up to 2^24, or 16M;
+ * - supports PSS up to 2^52 bytes, or 4PB.
  */
 #define PSS_SHIFT 12
 
@@ -634,7 +632,7 @@ static void smaps_pte_entry(pte_t *pte, unsigned long addr,
 		if (!page)
 			return;
 
-		if (xa_is_value(page))
+		if (radix_tree_exceptional_entry(page))
 			mss->swap += PAGE_SIZE;
 		else
 			put_page(page);
@@ -766,9 +764,6 @@ static void show_smap_vma_flags(struct seq_file *m, struct vm_area_struct *vma)
 		[ilog2(VM_PKEY_BIT4)]	= "",
 #endif
 #endif /* CONFIG_ARCH_HAS_PKEYS */
-#ifdef CONFIG_HAVE_ARCH_USERFAULTFD_MINOR
-		[ilog2(VM_UFFD_MINOR)]	= "ui",
-#endif /* CONFIG_HAVE_ARCH_USERFAULTFD_MINOR */
 	};
 	size_t i;
 
@@ -889,14 +884,36 @@ static int show_smap(struct seq_file *m, void *v)
 	struct vm_area_struct *vma = v;
 	struct mem_size_stats mss;
 
-#ifdef CONFIG_KSU_SUSFS_SUS_MAP
-	if (vma->vm_file) {
-		if (SUSFS_IS_INODE_SUS_MAP(file_inode(vma->vm_file)))
-			return 0;
-	}
-#endif // #ifdef CONFIG_KSU_SUSFS_SUS_MAP
-
 	memset(&mss, 0, sizeof(mss));
+
+#ifdef CONFIG_KSU_SUSFS_SUS_MAP
+	if (vma->vm_file &&
+		unlikely(file_inode(vma->vm_file)->i_mapping->flags & BIT_SUS_MAPS) &&
+		susfs_is_current_proc_umounted())
+	{
+		smap_gather_stats(vma, &mss);
+
+		show_map_vma(m, vma);
+		if (vma_get_anon_name(vma)) {
+			seq_puts(m, "Name:           ");
+			seq_print_vma_name(m, vma);
+		}
+
+		SEQ_PUT_DEC("Size:           ", vma->vm_end - vma->vm_start);
+		SEQ_PUT_DEC(" kB\nKernelPageSize: ", vma_kernel_pagesize(vma));
+		SEQ_PUT_DEC(" kB\nMMUPageSize:    ", vma_mmu_pagesize(vma));
+		seq_puts(m, " kB\n");
+
+		__show_smap(m, &mss);
+
+		seq_printf(m, "THPeligible:    %d\n", transparent_hugepage_enabled(vma));
+
+		if (arch_pkeys_enabled())
+			seq_printf(m, "ProtectionKey:  %8u\n", vma_pkey(vma));
+
+		goto bypass_orig_flow;
+	}
+#endif
 
 	smap_gather_stats(vma, &mss);
 
@@ -918,6 +935,11 @@ static int show_smap(struct seq_file *m, void *v)
 
 	if (arch_pkeys_enabled())
 		seq_printf(m, "ProtectionKey:  %8u\n", vma_pkey(vma));
+
+#ifdef CONFIG_KSU_SUSFS_SUS_MAP
+bypass_orig_flow:
+#endif
+
 	show_smap_vma_flags(m, vma);
 
 	m_cache_vma(m, vma);
@@ -946,19 +968,21 @@ static int show_smaps_rollup(struct seq_file *m, void *v)
 
 	memset(&mss, 0, sizeof(mss));
 
-	ret = mmap_read_lock_killable(mm);
+	ret = down_read_killable(&mm->mmap_sem);
 	if (ret)
 		goto out_put_mm;
 
 	hold_task_mempolicy(priv);
 
 	for (vma = priv->mm->mmap; vma; vma = vma->vm_next) {
-
 #ifdef CONFIG_KSU_SUSFS_SUS_MAP
-	if (vma->vm_file) {
-		if (vma->vm_file && SUSFS_IS_INODE_SUS_MAP(file_inode(vma->vm_file)))
+		if (vma->vm_file &&
+			unlikely(file_inode(vma->vm_file)->i_mapping->flags & BIT_SUS_MAPS) &&
+			susfs_is_current_proc_umounted())
+		{
+			memset(&mss, 0, sizeof(mss));
 			goto bypass_orig_flow;
-	}
+		}
 #endif
 		smap_gather_stats(vma, &mss);
 #ifdef CONFIG_KSU_SUSFS_SUS_MAP
@@ -975,7 +999,7 @@ bypass_orig_flow:
 	__show_smap(m, &mss);
 
 	release_task_mempolicy(priv);
-	mmap_read_unlock(mm);
+	up_read(&mm->mmap_sem);
 
 out_put_mm:
 	mmput(mm);
@@ -1236,7 +1260,6 @@ static ssize_t clear_refs_write(struct file *file, const char __user *buf,
 		return -ESRCH;
 	mm = get_task_mm(task);
 	if (mm) {
-		struct mmu_notifier_range range;
 		struct clear_refs_private cp = {
 			.type = type,
 		};
@@ -1248,7 +1271,7 @@ static ssize_t clear_refs_write(struct file *file, const char __user *buf,
 		};
 
 		if (type == CLEAR_REFS_MM_HIWATER_RSS) {
-			if (mmap_write_lock_killable(mm)) {
+			if (down_write_killable(&mm->mmap_sem)) {
 				count = -EINTR;
 				goto out_mm;
 			}
@@ -1258,11 +1281,11 @@ static ssize_t clear_refs_write(struct file *file, const char __user *buf,
 			 * resident set size to this mm's current rss value.
 			 */
 			reset_mm_hiwater_rss(mm);
-			mmap_write_unlock(mm);
+			up_write(&mm->mmap_sem);
 			goto out_mm;
 		}
 
-		if (mmap_read_lock_killable(mm)) {
+		if (down_read_killable(&mm->mmap_sem)) {
 			count = -EINTR;
 			goto out_mm;
 		}
@@ -1271,8 +1294,8 @@ static ssize_t clear_refs_write(struct file *file, const char __user *buf,
 			for (vma = mm->mmap; vma; vma = vma->vm_next) {
 				if (!(vma->vm_flags & VM_SOFTDIRTY))
 					continue;
-				mmap_read_unlock(mm);
-				if (mmap_write_lock_killable(mm)) {
+				up_read(&mm->mmap_sem);
+				if (down_write_killable(&mm->mmap_sem)) {
 					count = -EINTR;
 					goto out_mm;
 				}
@@ -1291,26 +1314,26 @@ static ssize_t clear_refs_write(struct file *file, const char __user *buf,
 					 * failed like if
 					 * get_proc_task() fails?
 					 */
-					mmap_write_unlock(mm);
+					up_write(&mm->mmap_sem);
 					goto out_mm;
 				}
 				for (vma = mm->mmap; vma; vma = vma->vm_next) {
-					vma->vm_flags &= ~VM_SOFTDIRTY;
+					vm_write_begin(vma);
+					WRITE_ONCE(vma->vm_flags,
+						vma->vm_flags & ~VM_SOFTDIRTY);
 					vma_set_page_prot(vma);
+					vm_write_end(vma);
 				}
-				mmap_write_downgrade(mm);
+				downgrade_write(&mm->mmap_sem);
 				break;
 			}
-
-			mmu_notifier_range_init(&range, MMU_NOTIFY_UNMAP, 0,
-						NULL, mm, 0, -1UL);
-			mmu_notifier_invalidate_range_start(&range);
+			mmu_notifier_invalidate_range_start(mm, 0, -1);
 		}
 		walk_page_range(0, mm->highest_vm_end, &clear_refs_walk);
 		if (type == CLEAR_REFS_SOFT_DIRTY)
-			mmu_notifier_invalidate_range_end(&range);
+			mmu_notifier_invalidate_range_end(mm, 0, -1);
 		tlb_finish_mmu(&tlb, 0, -1);
-		mmap_read_unlock(mm);
+		up_read(&mm->mmap_sem);
 out_mm:
 		mmput(mm);
 	}
@@ -1675,19 +1698,20 @@ static ssize_t pagemap_read(struct file *file, char __user *buf,
 		/* overflow ? */
 		if (end < start_vaddr || end > end_vaddr)
 			end = end_vaddr;
-		ret = mmap_read_lock_killable(mm);
+		ret = down_read_killable(&mm->mmap_sem);
 		if (ret)
 			goto out_free;
+		ret = walk_page_range(start_vaddr, end, &pagemap_walk);
+		up_read(&mm->mmap_sem);
 #ifdef CONFIG_KSU_SUSFS_SUS_MAP
 		vma = find_vma(mm, start_vaddr);
-		if (vma && vma->vm_file && SUSFS_IS_INODE_SUS_MAP(file_inode(vma->vm_file)))
-			goto bypass_orig_flow;
-#endif // #ifdef CONFIG_KSU_SUSFS_SUS_MAP
-		ret = walk_page_range(start_vaddr, end, &pagemap_walk);
-#ifdef CONFIG_KSU_SUSFS_SUS_MAP
-bypass_orig_flow:
-#endif // #ifdef CONFIG_KSU_SUSFS_SUS_MAP
-		mmap_read_unlock(mm);
+		if (vma && vma->vm_file) {
+			struct inode *inode = file_inode(vma->vm_file);
+			if (unlikely(inode->i_mapping->flags & BIT_SUS_MAPS) && susfs_is_current_proc_umounted()) {
+				pm.buffer->pme = 0;
+			}
+		}
+#endif
 		start_vaddr = end;
 
 		len = min(count, PM_ENTRY_BYTES * pm.pos);
@@ -1740,40 +1764,6 @@ const struct file_operations proc_pagemap_operations = {
 #endif /* CONFIG_PROC_PAGE_MONITOR */
 
 #ifdef CONFIG_PROCESS_RECLAIM
-
-#define FOREGROUND_APP_ADJ 0
-#define CACHED_APP_MIN_ADJ 900
-
-static bool running_state = true;
-static inline bool can_reclaim(short before_reclaim_adj,
-	struct mm_struct *mm, struct task_struct *task)
-{
-	short cur_oom_score_adj;
-
-	if (running_state == false ||
-			fatal_signal_pending(task) ||
-			task->flags & PF_EXITING ||
-			!list_empty(&mm->mmap_sem.wait_list)) {
-		pr_info("stop reclaim: force\n");
-
-		return false;
-	}
-
-	cur_oom_score_adj = task->signal->oom_score_adj;
-	if ((cur_oom_score_adj < CACHED_APP_MIN_ADJ &&
-			cur_oom_score_adj < before_reclaim_adj) ||
-			FOREGROUND_APP_ADJ == cur_oom_score_adj) {
-		pr_info("[c:%s %d, r:%s %d] adj adjust %d %d\n",
-			current->comm, current->pid,
-			task->comm, task->pid,
-			before_reclaim_adj, cur_oom_score_adj);
-
-		return false;
-	}
-
-	return true;
-}
-
 static BLOCKING_NOTIFIER_HEAD(proc_reclaim_notifier);
 
 int proc_reclaim_notifier_register(struct notifier_block *nb)
@@ -1815,7 +1805,7 @@ int reclaim_address_space(struct address_space *mapping,
 			continue;
 		}
 
-		if (xa_is_value(page))
+		if (radix_tree_exceptional_entry(page))
 			continue;
 
 		if (isolate_lru_page(page))
@@ -1842,7 +1832,7 @@ int reclaim_address_space(struct address_space *mapping,
 	return ret;
 }
 
-int reclaim_pte_range(pmd_t *pmd, unsigned long addr,
+static int reclaim_pte_range(pmd_t *pmd, unsigned long addr,
 				unsigned long end, struct mm_walk *walk)
 {
 	struct reclaim_param *rp = walk->private;
@@ -1867,12 +1857,6 @@ cont:
 
 		page = vm_normal_page(vma, addr, ptent);
 		if (!page)
-			continue;
-
-		if (!PageLRU(page))
-			continue;
-
-		if (page_mapcount(page) != 1)
 			continue;
 
 		if (isolate_lru_page(compound_head(page)))
@@ -1909,7 +1893,7 @@ cont:
 		goto cont;
 
 	cond_resched();
-	return (rp->nr_to_reclaim == 0) ? -EPIPE : 0;
+	return 0;
 }
 
 enum reclaim_type {
@@ -1931,11 +1915,11 @@ struct reclaim_param reclaim_task_nomap(struct task_struct *task,
 	mm = get_task_mm(task);
 	if (!mm)
 		goto out;
-	mmap_read_lock(mm);
+	down_read(&mm->mmap_sem);
 
 	proc_reclaim_notify((unsigned long)task_pid(task), (void *)&rp);
 
-	mmap_read_unlock(mm);
+	up_read(&mm->mmap_sem);
 	mmput(mm);
 out:
 	put_task_struct(task);
@@ -1962,7 +1946,7 @@ struct reclaim_param reclaim_task_anon(struct task_struct *task,
 
 	reclaim_walk.private = &rp;
 
-	mmap_read_lock(mm);
+	down_read(&mm->mmap_sem);
 	for (vma = mm->mmap; vma; vma = vma->vm_next) {
 		if (is_vm_hugetlb_page(vma))
 			continue;
@@ -1979,7 +1963,7 @@ struct reclaim_param reclaim_task_anon(struct task_struct *task,
 	}
 
 	flush_tlb_mm(mm);
-	mmap_read_unlock(mm);
+	up_read(&mm->mmap_sem);
 	mmput(mm);
 out:
 	put_task_struct(task);
@@ -1996,11 +1980,9 @@ static ssize_t reclaim_write(struct file *file, const char __user *buf,
 	enum reclaim_type type;
 	char *type_buf;
 	struct mm_walk reclaim_walk = {};
-	short before_reclaim_adj;
 	unsigned long start = 0;
 	unsigned long end = 0;
 	struct reclaim_param rp;
-	int ret;
 
 	memset(buffer, 0, sizeof(buffer));
 	if (count > sizeof(buffer) - 1)
@@ -2016,19 +1998,10 @@ static ssize_t reclaim_write(struct file *file, const char __user *buf,
 		type = RECLAIM_ANON;
 	else if (!strcmp(type_buf, "all"))
 		type = RECLAIM_ALL;
-	else if (!strcmp(type_buf, "start")) {
-		running_state = true;
-		return count;
-	} else if (!strcmp(type_buf, "end")) {
-		running_state = false;
-		return count;
-	} else if (isdigit(*type_buf))
+	else if (isdigit(*type_buf))
 		type = RECLAIM_RANGE;
 	else
 		goto out_err;
-
-	if (false == running_state)
-		return count;
 
 	if (type == RECLAIM_RANGE) {
 		char *token;
@@ -2076,11 +2049,7 @@ static ssize_t reclaim_write(struct file *file, const char __user *buf,
 	rp.nr_reclaimed = 0;
 	reclaim_walk.private = &rp;
 
-	if (NULL == task->signal)
-		goto out;
-
-	before_reclaim_adj = task->signal->oom_score_adj;
-	mmap_read_lock(mm);
+	down_read(&mm->mmap_sem);
 	if (type == RECLAIM_RANGE) {
 		vma = find_vma(mm, start);
 		while (vma) {
@@ -2090,18 +2059,13 @@ static ssize_t reclaim_write(struct file *file, const char __user *buf,
 				continue;
 
 			rp.vma = vma;
-			ret = walk_page_range(max(vma->vm_start, start),
+			walk_page_range(max(vma->vm_start, start),
 					min(vma->vm_end, end),
 					&reclaim_walk);
-			if (ret)
-				break;
 			vma = vma->vm_next;
 		}
 	} else {
 		for (vma = mm->mmap; vma; vma = vma->vm_next) {
-			if (!can_reclaim(before_reclaim_adj, mm, task))
-				break;
-
 			if (is_vm_hugetlb_page(vma))
 				continue;
 
@@ -2112,15 +2076,13 @@ static ssize_t reclaim_write(struct file *file, const char __user *buf,
 				continue;
 
 			rp.vma = vma;
-			ret = walk_page_range(vma->vm_start, vma->vm_end,
+			walk_page_range(vma->vm_start, vma->vm_end,
 				&reclaim_walk);
-			if (ret)
-				break;
 		}
 	}
 
 	flush_tlb_mm(mm);
-	mmap_read_unlock(mm);
+	up_read(&mm->mmap_sem);
 	mmput(mm);
 out:
 	put_task_struct(task);
