@@ -382,10 +382,16 @@ void susfs_set_hide_sus_mnts_for_non_su_procs(void __user **user_info) {
 		info.err = -EFAULT;
 		goto out_copy_to_user;
 	}
-	spin_lock(&susfs_spin_lock_sus_mount);
-	susfs_hide_sus_mnts_for_non_su_procs = info.enabled;
-	spin_unlock(&susfs_spin_lock_sus_mount);
-	SUSFS_LOGI("susfs_hide_sus_mnts_for_non_su_procs: %d\n", info.enabled);
+if (info.enabled) {
+    static_branch_enable(&susfs_is_hide_sus_mnts_for_non_su_procs_enabled);
+} else {
+    static_branch_disable(&susfs_is_hide_sus_mnts_for_non_su_procs_enabled);
+}
+
+SUSFS_LOGI(
+    "susfs_is_hide_sus_mnts_for_non_su_procs_enabled: %d\n",
+    static_key_enabled(&susfs_is_hide_sus_mnts_for_non_su_procs_enabled)
+);
 	info.err = 0;
 out_copy_to_user:
 	if (copy_to_user(&((struct st_susfs_hide_sus_mnts_for_non_su_procs __user*)*user_info)->err, &info.err, sizeof(info.err))) {
@@ -608,7 +614,7 @@ void susfs_set_uname(void __user **user_info) {
 		strncpy(my_uname.release, info.release, __NEW_UTS_LEN);
 	}
 	if (!strcmp(info.version, "default")) {
-		strncpy(my_uname.version, utsname()->version, __NEW_UTS_LEN);
+strscpy(my_uname.version, info.version, __NEW_UTS_LEN);
 	} else {
 		strncpy(my_uname.version, info.version, __NEW_UTS_LEN);
 	}
@@ -1055,7 +1061,19 @@ void susfs_start_sdcard_monitor_fn(void) {
 		susfs_is_sdcard_android_data_decrypted = true;
 	}
 }
+// - defer extra susfs works to workqueue after do_umount in ksu_handle_setresuid()
+//   so that we do not block there and reduce the risk of time side channel as much as possible.
+struct work_struct susfs_extra_works;
 
+static void susfs_run_extra_works(struct work_struct *work)
+{
+    if (!ksu_cred)
+        return;
+
+#ifdef CONFIG_KSU_SUSFS_SUS_PATH
+    susfs_run_sus_path_loop();
+#endif // CONFIG_KSU_SUSFS_SUS_PATH
+}
 /* susfs_init */
 void susfs_init(void) {
 #ifdef CONFIG_KSU_SUSFS_SPOOF_UNAME
