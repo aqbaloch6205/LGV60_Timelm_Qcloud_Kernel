@@ -1674,24 +1674,13 @@ static struct dentry *__lookup_hash(const struct qstr *name,
 	struct inode *dir = base->d_inode;
 
 #ifdef CONFIG_KSU_SUSFS_SUS_PATH
-	if (base && base->d_inode && !found_sus_path) {
-		if (susfs_is_base_dentry_android_data_dir(base) &&
-			susfs_is_sus_android_data_d_name_found(name->name))
-		{
-			dentry = lookup_dcache(&susfs_fake_qstr_name, base, flags);
-			found_sus_path = true;
-			goto retry;
-		} else if (susfs_is_base_dentry_sdcard_dir(base) &&
-				   susfs_is_sus_sdcard_d_name_found(name->name))
-		{
-			dentry = lookup_dcache(&susfs_fake_qstr_name, base, flags);
-			found_sus_path = true;
-			goto retry;
-		}
-	}
-	dentry = lookup_dcache(name, base, flags);
-retry:
+#ifdef CONFIG_KSU
+	bool found_sus_path = false;
 #endif
+
+	if (dentry) {
+		return dentry;
+	}
 
 	if (dentry) {
 #ifdef CONFIG_KSU_SUSFS_SUS_PATH
