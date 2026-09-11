@@ -354,28 +354,15 @@ static void show_vma_header_prefix(struct seq_file *m,
 }
 
 #ifdef CONFIG_KSU_SUSFS_SUS_KSTAT
-extern void susfs_sus_ino_for_show_map_vma(unsigned long ino, dev_t *out_dev, unsigned long *out_ino);
-#endif
-
-
-static void
-show_map_vma(struct seq_file *m, struct vm_area_struct *vma)
-{
-	struct mm_struct *mm = vma->vm_mm;
-	struct file *file = vma->vm_file;
-	vm_flags_t flags = vma->vm_flags;
-	unsigned long ino = 0;
-	unsigned long long pgoff = 0;
-	unsigned long start, end;
-	dev_t dev = 0;
-	const char *name = NULL;
+extern void susfs_sus_kstat_spoof_show_map_vma(struct inode *inode, dev_t *out_dev, unsigned long *out_ino);
+#endif // #ifdef CONFIG_KSU_SUSFS_SUS_KSTAT
 #ifdef CONFIG_KSU_SUSFS_OPEN_REDIRECT
-	char *spoofed_redirected_name = NULL;
+extern int susfs_open_redirect_spoof_show_map_vma(struct inode *inode, unsigned long *out_ino, dev_t *out_dev, char *spoofed_name);
 #endif // #ifdef CONFIG_KSU_SUSFS_OPEN_REDIRECT
-
-
 	if (file) {
 		struct inode *inode = file_inode(vma->vm_file);
+
+		/* Original flow continues here */
 #ifdef CONFIG_KSU_SUSFS_SUS_MAP
 		if (unlikely(inode->i_mapping->flags & BIT_SUS_MAPS) && susfs_is_current_proc_umounted()) {
 			seq_setwidth(m, 25 + sizeof(void *) * 6 - 1);
@@ -409,6 +396,9 @@ bypass_orig_flow:
 
 	}
 
+#ifdef CONFIG_KSU_SUSFS_OPEN_REDIRECT
+orig_flow:
+#endif // #ifdef CONFIG_KSU_SUSFS_OPEN_REDIRECT
 	start = vma->vm_start;
 	end = vma->vm_end;
 	show_vma_header_prefix(m, start, end, flags, pgoff, dev, ino);
@@ -418,6 +408,17 @@ bypass_orig_flow:
 	 * Print the dentry name for named mappings, and a
 	 * special [heap] marker for the heap:
 	 */
+
+#ifdef CONFIG_KSU_SUSFS_OPEN_REDIRECT
+	if (spoofed_redirected_name) {
+		seq_pad(m, ' ');
+		seq_puts(m, spoofed_redirected_name);
+		seq_putc(m, '\n');
+		kfree(spoofed_redirected_name);
+		return;
+	}
+#endif // #ifdef CONFIG_KSU_SUSFS_OPEN_REDIRECT
+
 	if (file) {
 		seq_pad(m, ' ');
 		seq_file_path(m, file, "\n");
