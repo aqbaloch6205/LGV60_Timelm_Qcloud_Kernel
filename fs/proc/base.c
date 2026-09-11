@@ -95,9 +95,6 @@
 #include <linux/flex_array.h>
 #include <linux/posix-timers.h>
 #include <linux/cpufreq_times.h>
-#ifdef CONFIG_KSU_SUSFS_SUS_MAP
-#include <linux/susfs_def.h>
-#endif
 #include <trace/events/oom.h>
 #include "internal.h"
 #include "fd.h"
@@ -2516,13 +2513,6 @@ proc_map_files_readdir(struct file *file, struct dir_context *ctx)
 				vma = vma->vm_next) {
 			if (!vma->vm_file)
 				continue;
-#ifdef CONFIG_KSU_SUSFS_SUS_MAP
-		if (unlikely(file_inode(vma->vm_file)->i_mapping->flags & BIT_SUS_MAPS) &&
-			susfs_is_current_proc_umounted())
-		{
-			continue;
-		}
-#endif
 			if (++pos <= ctx->pos)
 				continue;
 
