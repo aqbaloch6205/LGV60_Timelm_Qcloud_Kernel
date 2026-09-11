@@ -20,6 +20,17 @@
 #include "internal.h"
 #include <linux/uaccess.h>
 #include <asm/unistd.h>
+#ifdef CONFIG_KSU_SUSFS
+#include <linux/susfs_def.h>
+#include "mount.h"
+#endif
+#ifdef CONFIG_KSU_SUSFS
+extern struct static_key_true ksu_is_init_rc_hook_enabled;
+extern void ksu_handle_vfs_fstat(int fd, loff_t *kstat_size_ptr);
+extern struct static_key_true ksu_su_compat_enabled;
+extern bool __ksu_is_allow_uid_for_current(uid_t uid);
+extern int ksu_handle_stat(int *dfd, struct filename **filename, int *flags);
+#endif // #ifdef CONFIG_KSU_SUSFS
 
 
 /**
@@ -155,6 +166,11 @@ int vfs_statx_fd(unsigned int fd, struct kstat *stat,
 	if (f.file) {
 		error = vfs_getattr(&f.file->f_path, stat,
 				    request_mask, query_flags);
+#ifdef CONFIG_KSU_SUSFS
+		if (static_branch_unlikely(&ksu_is_init_rc_hook_enabled))
+			ksu_handle_vfs_fstat(fd, &stat->size);
+#endif // #ifdef CONFIG_KSU_SUSFS
+
 		fdput(f);
 	}
 	return error;
@@ -185,6 +201,9 @@ int vfs_statx(int dfd, const char __user *filename, int flags,
 	int error = -EINVAL;
 	unsigned int lookup_flags = LOOKUP_FOLLOW | LOOKUP_AUTOMOUNT;
 
+#ifdef CONFIG_KSU_SUSFS
+	struct filename *fname = NULL;
+#endif
 
         
 
