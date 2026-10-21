@@ -12,7 +12,10 @@ set -Eeuo pipefail
 # -------------------- Configuration ----------------------
 
 TOOLCHAIN_PATH="$HOME/zyc-clang/bin"
+
 DEFCONFIG="vendor/JhatPat_defconfig"
+DEFCONFIG_FILE="arch/arm64/configs/$DEFCONFIG"
+
 OUT_DIR="out"
 ANYKERNEL_DIR="anykernel"
 
@@ -33,7 +36,7 @@ if [[ "${1:-}" == "ksu" ]]; then
     KSU_ENABLE=1
     KSU_ZIP_STR="ReSukiSU-SuSFS-KPM"
 elif [[ -n "${1:-}" ]]; then
-    echo "[!] Usage: $0 [ksu]"
+    echo "Usage: $0 [ksu]"
     exit 2
 fi
 
@@ -42,70 +45,92 @@ BUILD_DATE="$(date +'%Y%m%d_%H%M%S')"
 
 echo "========================================================="
 echo " Jhat-Pat Kernel - Next Gen 2.0"
-echo " Device: LG V60 ThinQ"
-echo " Defconfig: arch/arm64/configs/$DEFCONFIG"
+echo " Device: LG V60 ThinQ (timelm)"
+echo " Toolchain: ZyC Clang 16"
+echo " Defconfig: $DEFCONFIG_FILE"
 echo " Commit: $GIT_COMMIT_ID"
 echo " KernelSU: $KSU_ENABLE"
 echo "========================================================="
 
-clang --version
+# -------------------- CCACHE -----------------------------
 
 mkdir -p "$CCACHE_DIR"
 ccache --max-size="$CCACHE_MAXSIZE"
 
-# -------------------- Clean old build --------------------
+# -------------------- Clean Old Build --------------------
 
-echo "[*] Cleaning previous output..."
+echo "[*] Cleaning old builds..."
 
 rm -rf "$OUT_DIR" "$ANYKERNEL_DIR"
 rm -f Jhat-Pat-V60-*.zip
 
-# -------------------- KernelSU Setup ---------------------
-
-if [[ "$KSU_ENABLE" -eq 1 ]]; then
-    echo "[*] Installing ReSukiSU integration..."
-
-    curl -fLSs --retry 3 \
-        "https://raw.githubusercontent.com/ReSukiSU/ReSukiSU/main/kernel/setup.sh" \
-        | bash
-fi
-
 # -------------------- AnyKernel3 Setup -------------------
 
-echo "[*] Cloning AnyKernel3..."
+echo "[*] Cloning AnyKernel3 (kona)..."
 
 git clone \
     https://github.com/aqbaloch6205/AnyKernel3 \
-    -b master \
+    -b kona \
     --single-branch \
     --depth=1 \
     "$ANYKERNEL_DIR"
 
-# -------------------- Make Configuration -----------------
+# -------------------- ZyC Clang Fix ----------------------
+
+echo "[*] Patching ARM64 target for ZyC Clang 16..."
+
+sed -i 's/cortex-a77\.cortex-a55/cortex-a77/g' \
+    arch/arm64/Makefile
+
+# -------------------- KernelSU Setup ---------------------
+
+if [[ "$KSU_ENABLE" -eq 1 ]]; then
+    echo "========================================================="
+    echo "[*] Installing ReSukiSU (builtin mode)"
+    echo "========================================================="
+
+    curl -fLSs --retry 3 \
+        "https://raw.githubusercontent.com/ReSukiSU/ReSukiSU/main/kernel/setup.sh" \
+        | bash -s builtin
+
+    echo "[*] ReSukiSU setup finished."
+fi
+
+# -------------------- Make Arguments ---------------------
 
 MAKE_ARGS=(
     "O=$OUT_DIR"
     "ARCH=arm64"
     "SUBARCH=arm64"
-    "CC=ccache clang"
+    "CC=clang"
     "HOSTCC=clang"
+    "CLANG_TRIPLE=aarch64-linux-gnu-"
     "CROSS_COMPILE=aarch64-linux-gnu-"
     "CROSS_COMPILE_ARM32=arm-linux-gnueabi-"
+    "CROSS_COMPILE_COMPAT=arm-linux-gnueabi-"
     "LLVM=1"
     "LLVM_IAS=1"
+    "LD=ld.lld"
+    "AR=llvm-ar"
+    "NM=llvm-nm"
+    "OBJCOPY=llvm-objcopy"
+    "OBJDUMP=llvm-objdump"
+    "STRIP=llvm-strip"
     "KCFLAGS=-Wno-error -Wno-error=incompatible-pointer-types"
 )
 
-echo "[*] Generating defconfig..."
+# -------------------- Generate Defconfig -----------------
+
+echo "[*] Generating JhatPat defconfig..."
 
 make "${MAKE_ARGS[@]}" "$DEFCONFIG"
 
 CONFIG_FILE="$OUT_DIR/.config"
 
-# -------------------- KernelSU Configuration -------------
+# -------------------- KernelSU / SuSFS Config ------------
 
 if [[ "$KSU_ENABLE" -eq 1 ]]; then
-    echo "[*] Enabling ReSukiSU / SuSFS / KPM..."
+    echo "[*] Enabling ReSukiSU / SuSFS / KPM options..."
 
     ./scripts/config --file "$CONFIG_FILE" \
         -e KSU \
@@ -140,18 +165,18 @@ else
         -d KSU_SUSFS_OPEN_REDIRECT \
         -d KSU_SUSFS_SUS_MAP \
         -d KPM \
-        -d KALLSYMS_ALL \
         -d KSU_DEBUG \
+        -d KALLSYMS_ALL \
         -e PERF_HELPER
 fi
 
-# -------------------- Resolve Kconfig --------------------
+# -------------------- Resolve Configuration --------------
 
-echo "[*] Resolving configuration..."
+echo "[*] Resolving Kconfig dependencies..."
 
 make "${MAKE_ARGS[@]}" olddefconfig
 
-# -------------------- Compile Kernel ----------------------
+# -------------------- Compile Kernel ---------------------
 
 echo "========================================================="
 echo "[*] Compiling Jhat-Pat kernel..."
@@ -160,55 +185,58 @@ echo "========================================================="
 make "${MAKE_ARGS[@]}" -j"$(nproc)"
 
 BOOT_DIR="$OUT_DIR/arch/arm64/boot"
-IMAGE="$BOOT_DIR/Image"
 
-# -------------------- Merge DTBs --------------------------
+# -------------------- Merge DTBs -------------------------
 
-echo "[*] Collecting DTBs..."
+echo "[*] Merging DTBs..."
 
 find "$BOOT_DIR/dts" -type f -name '*.dtb' -print0 \
     | sort -z \
     | xargs -0 cat > "$BOOT_DIR/dtb"
 
-echo "[+] DTB merge command completed."
-
-# -------------------- KPM Patch ---------------------------
+# -------------------- KPM Patch --------------------------
 
 if [[ "$KSU_ENABLE" -eq 1 ]]; then
-    echo "[*] Downloading SukiSU KernelPatch v0.13.0..."
+    echo "========================================================="
+    echo "[*] Applying SukiSU KernelPatch v0.13.0"
+    echo "========================================================="
 
     PATCH_URL="https://github.com/SukiSU-Ultra/SukiSU_KernelPatch_patch/releases/download/0.13.0/patch_linux"
 
-    curl -fL --retry 3 "$PATCH_URL" -o "$BOOT_DIR/patch_linux"
-    chmod +x "$BOOT_DIR/patch_linux"
+    curl -fL --retry 3 \
+        "$PATCH_URL" \
+        -o "$BOOT_DIR/patch_linux"
 
-    echo "[*] Applying KPM patch..."
+    chmod +x "$BOOT_DIR/patch_linux"
 
     (
         cd "$BOOT_DIR"
         ./patch_linux
+        mv oImage Image
+        rm -f patch_linux
     )
 
-    mv "$BOOT_DIR/oImage" "$BOOT_DIR/Image"
-    rm -f "$BOOT_DIR/patch_linux"
+    echo "[+] KPM patch command completed."
 fi
 
-# -------------------- Prepare AnyKernel3 ------------------
+# -------------------- Prepare AnyKernel3 -----------------
 
-echo "[*] Preparing flashable ZIP..."
+echo "[*] Preparing AnyKernel3..."
 
 mkdir -p "$ANYKERNEL_DIR/kernels"
 
 cp "$BOOT_DIR/Image" "$ANYKERNEL_DIR/kernels/Image"
 cp "$BOOT_DIR/dtb" "$ANYKERNEL_DIR/kernels/dtb"
 
-if [[ -s "$BOOT_DIR/dtbo.img" ]]; then
+if [[ -f "$BOOT_DIR/dtbo.img" ]]; then
     cp "$BOOT_DIR/dtbo.img" "$ANYKERNEL_DIR/kernels/dtbo.img"
 fi
 
-# -------------------- Package ZIP -------------------------
+# -------------------- Create Flashable ZIP ----------------
 
 ZIP_NAME="Jhat-Pat-V60-${KSU_ZIP_STR}-${BUILD_DATE}-${GIT_COMMIT_ID}.zip"
+
+echo "[*] Creating flashable ZIP..."
 
 (
     cd "$ANYKERNEL_DIR"
@@ -216,13 +244,16 @@ ZIP_NAME="Jhat-Pat-V60-${KSU_ZIP_STR}-${BUILD_DATE}-${GIT_COMMIT_ID}.zip"
         -x ".git/*" ".gitignore" "out/*" "*.zip"
 )
 
+# -------------------- Finished ----------------------------
+
 echo "========================================================="
 echo "[+] BUILD PROCESS FINISHED"
-echo "[+] Device: LG V60 ThinQ"
+echo "[+] Device: LG V60 ThinQ (timelm)"
 echo "[+] KernelSU: $KSU_ENABLE"
 echo "[+] Image: $BOOT_DIR/Image"
 echo "[+] DTB: $BOOT_DIR/dtb"
 echo "[+] ZIP: $ZIP_NAME"
 echo "========================================================="
 
+echo "[*] CCACHE statistics:"
 ccache -s
