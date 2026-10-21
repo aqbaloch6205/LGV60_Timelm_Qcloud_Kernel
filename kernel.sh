@@ -1,3 +1,4 @@
+
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
@@ -11,11 +12,17 @@ set -Eeuo pipefail
 # -------------------- Configuration ----------------------
 
 TOOLCHAIN_PATH="$HOME/zyc-clang/bin"
+
+# Defconfig name passed to make
 DEFCONFIG="vendor/JhatPat_defconfig"
+
+# Actual defconfig file path
+DEFCONFIG_FILE="arch/arm64/configs/$DEFCONFIG"
+
 OUT_DIR="out"
 ANYKERNEL_DIR="anykernel"
 
-export KBUILD_BUILD_USER="QCloudfx"
+export KBUILD_BUILD_USER="QCloudFx"
 export KBUILD_BUILD_HOST="Abdul-Qadeer"
 export ARCH=arm64
 export SUBARCH=arm64
@@ -43,8 +50,8 @@ if [[ ! -f Makefile ]]; then
     exit 1
 fi
 
-if [[ ! -f "$DEFCONFIG" ]]; then
-    echo "[!] Defconfig not found: $DEFCONFIG"
+if [[ ! -f "$DEFCONFIG_FILE" ]]; then
+    echo "[!] Defconfig not found: $DEFCONFIG_FILE"
     exit 1
 fi
 
@@ -63,15 +70,23 @@ if ! command -v zip >/dev/null 2>&1; then
     exit 1
 fi
 
+if ! command -v unzip >/dev/null 2>&1; then
+    echo "[!] unzip is not installed."
+    exit 1
+fi
+
 if ! command -v aarch64-linux-gnu-gcc >/dev/null 2>&1; then
     echo "[!] aarch64-linux-gnu-gcc is missing."
-    echo "[!] Install the required cross-compiler or verify your toolchain."
     exit 1
 fi
 
 if ! command -v arm-linux-gnueabi-gcc >/dev/null 2>&1; then
     echo "[!] arm-linux-gnueabi-gcc is missing."
-    echo "[!] Install the required 32-bit cross-compiler."
+    exit 1
+fi
+
+if ! command -v git >/dev/null 2>&1; then
+    echo "[!] Git is not installed."
     exit 1
 fi
 
@@ -80,19 +95,24 @@ if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
     exit 1
 fi
 
+if ! command -v curl >/dev/null 2>&1; then
+    echo "[!] curl is not installed."
+    exit 1
+fi
+
 GIT_COMMIT_ID="$(git rev-parse --short=8 HEAD)"
 BUILD_DATE="$(date +'%Y%m%d_%H%M%S')"
 
 echo "========================================================="
-echo " Thunder Kernel - Next Gen 2.0"
+echo " Jhat-Pat Kernel - Next Gen 2.0"
 echo " Device: LG V60 ThinQ"
-echo " Defconfig: $DEFCONFIG"
+echo " Defconfig: $DEFCONFIG_FILE"
 echo " Commit: $GIT_COMMIT_ID"
 echo " KernelSU: $KSU_ENABLE"
 echo "========================================================="
 
 echo "[*] Clang version:"
-clang --version
+"$TOOLCHAIN_PATH/clang" --version
 
 mkdir -p "$CCACHE_DIR"
 ccache --max-size="$CCACHE_MAXSIZE"
@@ -111,15 +131,16 @@ if [[ "$KSU_ENABLE" -eq 1 ]]; then
     echo "[*] Installing ReSukiSU integration"
     echo "========================================================="
 
-    # Uses the same ReSukiSU setup source as the Xiaomi
-    # reference workflow. Review upstream changes before use.
-    curl -fLSs \
+    # Review upstream setup.sh before running it.
+    curl -fLSs --retry 3 \
       "https://raw.githubusercontent.com/ReSukiSU/ReSukiSU/main/kernel/setup.sh" \
-      | bash
+      -o /tmp/jhatpat_ksu_setup.sh
 
-    echo "[*] ReSukiSU setup command completed."
-    echo "[!] Manual hook integration must already be supported"
-    echo "[!] by this kernel source for the selected integration."
+    bash /tmp/jhatpat_ksu_setup.sh
+    rm -f /tmp/jhatpat_ksu_setup.sh
+
+    echo "[+] ReSukiSU setup command completed."
+    echo "[!] Kernel hook integration must be supported by this source."
 fi
 
 # -------------------- AnyKernel3 Setup -------------------
@@ -137,15 +158,15 @@ git clone \
 
 MAKE_ARGS=(
     "O=$OUT_DIR"
-    ARCH=arm64
-    SUBARCH=arm64
-    CC="ccache clang"
-    HOSTCC=clang
-    CROSS_COMPILE=aarch64-linux-gnu-
-    CROSS_COMPILE_ARM32=arm-linux-gnueabi-
-    LLVM=1
-    LLVM_IAS=1
-    KCFLAGS="-Wno-error -Wno-error=incompatible-pointer-types"
+    "ARCH=arm64"
+    "SUBARCH=arm64"
+    "CC=ccache clang"
+    "HOSTCC=clang"
+    "CROSS_COMPILE=aarch64-linux-gnu-"
+    "CROSS_COMPILE_ARM32=arm-linux-gnueabi-"
+    "LLVM=1"
+    "LLVM_IAS=1"
+    "KCFLAGS=-Wno-error -Wno-error=incompatible-pointer-types"
 )
 
 echo "[*] Generating kernel defconfig..."
@@ -154,7 +175,7 @@ make "${MAKE_ARGS[@]}" "$DEFCONFIG"
 
 CONFIG_FILE="$OUT_DIR/.config"
 
-if [[ ! -f "$CONFIG_FILE" ]]; then
+if [[ ! -s "$CONFIG_FILE" ]]; then
     echo "[!] Kernel .config was not generated."
     exit 1
 fi
@@ -197,10 +218,13 @@ else
         -d KSU_SUSFS_OPEN_REDIRECT \
         -d KSU_SUSFS_SUS_MAP \
         -d KPM \
+        -d KALLSYMS_ALL \
+        -d KSU_DEBUG \
         -e PERF_HELPER
 fi
 
-# Resolve Kconfig dependencies.
+# -------------------- Resolve Kconfig --------------------
+
 echo "[*] Resolving kernel configuration..."
 
 make "${MAKE_ARGS[@]}" olddefconfig
@@ -213,12 +237,12 @@ if [[ "$KSU_ENABLE" -eq 1 ]]; then
     for symbol in KSU KSU_SUSFS KPM KALLSYMS KALLSYMS_ALL; do
         if ! grep -qx "CONFIG_${symbol}=y" "$CONFIG_FILE"; then
             echo "[!] Required symbol CONFIG_${symbol}=y is missing."
-            echo "[!] Check source support and Kconfig dependencies."
+            echo "[!] Source support or Kconfig dependencies may be missing."
             exit 1
         fi
     done
 
-    echo "[+] Core KSU / SuSFS / KPM configuration verified."
+    echo "[+] Core configuration verified."
 fi
 
 # -------------------- Compile Kernel ----------------------
@@ -233,7 +257,7 @@ BOOT_DIR="$OUT_DIR/arch/arm64/boot"
 IMAGE="$BOOT_DIR/Image"
 
 if [[ ! -s "$IMAGE" ]]; then
-    echo "[!] Kernel compilation did not produce a valid Image."
+    echo "[!] Kernel compilation did not produce Image."
     exit 1
 fi
 
@@ -245,6 +269,7 @@ echo "[*] Collecting device tree binaries..."
 
 if [[ ! -d "$BOOT_DIR/dts" ]]; then
     echo "[!] DTB directory not found: $BOOT_DIR/dts"
+    echo "[!] Check this kernel tree's DTB output layout."
     exit 1
 fi
 
@@ -291,10 +316,8 @@ if [[ "$KSU_ENABLE" -eq 1 ]]; then
         ./patch_linux
     )
 
-    # This release/tool is expected to produce oImage.
-    # Do not replace the original Image unless the output exists.
     if [[ ! -s "$PATCH_DIR/oImage" ]]; then
-        echo "[!] KPM patch did not produce a non-empty oImage."
+        echo "[!] KPM patch did not produce oImage."
         echo "[!] Original Image has been preserved."
         exit 1
     fi
