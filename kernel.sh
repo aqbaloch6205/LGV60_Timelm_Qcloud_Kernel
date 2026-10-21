@@ -1,4 +1,3 @@
-
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
@@ -68,12 +67,7 @@ rm -f Jhat-Pat-V60-*.zip
 
 echo "[*] Cloning AnyKernel3 (kona)..."
 
-git clone \
-    https://github.com/aqbaloch6205/AnyKernel3 \
-    -b kona \
-    --single-branch \
-    --depth=1 \
-    "$ANYKERNEL_DIR"
+git clone https://github.com/aqbaloch6205/AnyKernel3 --single-branch --depth=1 "$ANYKERNEL_DIR"
 
 # -------------------- ZyC Clang Fix ----------------------
 
