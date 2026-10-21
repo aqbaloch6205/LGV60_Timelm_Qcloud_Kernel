@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       include_ksu:
-        description: 'Include KernelSU / SuSFS (if supported by kernel.sh)'
+        description: 'Include KernelSU?'
         required: true
         default: 'true'
         type: choice
@@ -12,223 +12,72 @@ on:
           - 'true'
           - 'false'
 
-permissions:
-  contents: read
-
-concurrency:
-  group: jhatpat-kernel-${{ github.ref }}-${{ github.event.inputs.include_ksu }}
-  cancel-in-progress: false
-
 jobs:
   build:
-    name: Build LM-V600 | KSU=${{ inputs.include_ksu }}
     runs-on: ubuntu-22.04
-    timeout-minutes: 360
-
-    env:
-      CCACHE_DIR: ${{ github.workspace }}/.ccache
-      CCACHE_MAXSIZE: 5G
-      ARCH: arm64
-      SUBARCH: arm64
 
     steps:
-      - name: Checkout source
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 1
+    - name: Checkout source
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 1
 
-      - name: Set build variables
-        id: vars
-        shell: bash
-        run: |
-          echo "SHORT_SHA=${GITHUB_SHA::8}" >> "$GITHUB_ENV"
-          echo "BUILD_DATE=$(date -u +'%Y%m%d-%H%M')" >> "$GITHUB_ENV"
+    - name: Install dependencies
+      run: |
+        sudo apt update
+        sudo apt install -y build-essential git curl wget bison flex zip bc cpio libssl-dev ccache python-is-python3 tar
 
-      - name: Install dependencies
-        shell: bash
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            bc \
-            bison \
-            build-essential \
-            ccache \
-            curl \
-            flex \
-            gawk \
-            git \
-            gnupg \
-            gperf \
-            libncurses-dev \
-            libssl-dev \
-            libelf-dev \
-            liblz4-tool \
-            lz4 \
-            lzop \
-            cpio \
-            rsync \
-            python3 \
-            python-is-python3 \
-            perl \
-            tar \
-            unzip \
-            wget \
-            zip \
-            zlib1g-dev
+    - name: Set short commit SHA
+      id: vars
+      run: echo "SHORT_SHA=$(echo ${GITHUB_SHA} | cut -c1-8)" >> $GITHUB_ENV
 
-      - name: Cache ccache
-        uses: actions/cache@v4
-        with:
-          path: .ccache
-          key: ${{ runner.os }}-jhatpat-v60-clang16-${{ inputs.include_ksu }}-${{ hashFiles('**/*defconfig', '**/Makefile', 'kernel.sh') }}
-          restore-keys: |
-            ${{ runner.os }}-jhatpat-v60-clang16-${{ inputs.include_ksu }}-
-            ${{ runner.os }}-jhatpat-v60-clang16-
+    - name: Cache ccache
+      uses: actions/cache@v4
+      with:
+        path: ~/.cache/ccache_mikernel
+        # Removed the 'device' input reference since your device is fixed (LMV600)
+        key: ${{ runner.os }}-ccache-v60-${{ github.event.inputs.include_ksu }}-${{ env.SHORT_SHA }}
+        restore-keys: |
+          ${{ runner.os }}-ccache-v60-${{ github.event.inputs.include_ksu }}-
+          ${{ runner.os }}-ccache-v60-
 
-      - name: Download and setup ZyC Clang 16
-        shell: bash
-        run: |
-          set -euo pipefail
+    - name: Download and Setup ZyC-Clang 16 Toolchain
+      run: |
+        mkdir -p $HOME/zyc-clang
+        cd $HOME/zyc-clang
+        wget -q https://github.com/ZyCromerZ/Clang/releases/download/16.0.6-20260510-release/Clang-16.0.6-20260510.tar.gz
+        tar -zxvf Clang-16.0.6-20260510.tar.gz
+        rm -f Clang-16.0.6-20260510.tar.gz
+        echo "$HOME/zyc-clang/bin" >> $GITHUB_PATH
 
-          mkdir -p "$HOME/zyc-clang"
-          cd "$HOME/zyc-clang"
+    - name: Build kernel
+      run: |
+        # Exporting path for the toolchain
+        export PATH="$HOME/zyc-clang/bin:$PATH"
+        if [ "${{ github.event.inputs.include_ksu }}" = "true" ]; then
+          # Ensure your build.sh is set up to handle the 'ksu' argument
+          bash kernel.sh ksu
+        else
+          bash kernel.sh
+        fi
 
-          URL="https://github.com/ZyCromerZ/Clang/releases/download/16.0.6-20260510-release/Clang-16.0.6-20260510.tar.gz"
+    - name: Show ccache stats
+      run: ccache -s
 
-          wget --show-progress "$URL" -O clang.tar.gz
-          tar -xzf clang.tar.gz
-          rm -f clang.tar.gz
-
-          CLANG_BIN="$(find "$HOME/zyc-clang" -type f -name clang -perm /111 -print -quit)"
-
-          if [ -z "$CLANG_BIN" ]; then
-            echo "::error::Clang executable not found in downloaded archive"
-            find "$HOME/zyc-clang" -maxdepth 3 -type f | head -100
-            exit 1
-          fi
-
-          CLANG_DIR="$(dirname "$CLANG_BIN")"
-          echo "$CLANG_DIR" >> "$GITHUB_PATH"
-          echo "CLANG_BIN=$CLANG_BIN" >> "$GITHUB_ENV"
-
-      - name: Verify toolchain and build script
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          test -f kernel.sh || {
-            echo "::error::kernel.sh not found in repository root"
-            exit 1
-          }
-
-          chmod +x kernel.sh
-
-          echo "=== Clang ==="
-          "$CLANG_BIN" --version
-
-          echo "=== ccache ==="
-          ccache --version
-          ccache -s
-
-          echo "=== Build script syntax ==="
-          bash -n kernel.sh
-
-          echo "=== Repository root ==="
-          ls -la
-
-      - name: Build kernel
-        shell: bash
-        env:
-          INCLUDE_KSU: ${{ inputs.include_ksu }}
-        run: |
-          set -Eeuo pipefail
-
-          mkdir -p "$GITHUB_WORKSPACE/artifacts"
-
-          echo "======================================"
-          echo " Jhat-Pat Kernel - Next Gen 2.0"
-          echo " Device: LG V60 ThinQ (LM-V600)"
-          echo " Commit: $GITHUB_SHA"
-          echo " KernelSU option: $INCLUDE_KSU"
-          echo "======================================"
-
-          ccache -z
-
-          if [ "$INCLUDE_KSU" = "true" ]; then
-            bash kernel.sh ksu
-          else
-            bash kernel.sh
-          fi
-
-          echo "=== Build script completed ==="
-          ccache -s
-
-      - name: Collect build artifacts
-        if: always()
-        shell: bash
-        run: |
-          set -u
-
-          mkdir -p artifacts
-
-          echo "=== Searching for generated ZIPs ==="
-          find "$GITHUB_WORKSPACE" \
-            -type f \
-            -name '*.zip' \
-            -not -path '*/.git/*' \
-            -not -path '*/.ccache/*' \
-            -not -path '*/artifacts/*' \
-            -print
-
-          while IFS= read -r -d '' file; do
-            cp -f "$file" "artifacts/$(basename "$file")"
-          done < <(
-            find "$GITHUB_WORKSPACE" \
-              -type f \
-              -name '*.zip' \
-              -not -path '*/.git/*' \
-              -not -path '*/.ccache/*' \
-              -not -path '*/artifacts/*' \
-              -print0
-          )
-
-          echo "=== Searching for kernel images and DTBs ==="
-
-          for dir in \
-            "$GITHUB_WORKSPACE/out/arch/arm64/boot" \
-            "$GITHUB_WORKSPACE/arch/arm64/boot"
-          do
-            if [ -d "$dir" ]; then
-              find "$dir" -maxdepth 5 -type f \
-                \( -name 'Image' \
-                -o -name 'Image.gz' \
-                -o -name 'Image.gz-dtb' \
-                -o -name 'Image-dtb' \
-                -o -name 'dtb' \
-                -o -name '*.dtb' \
-                -o -name '*.dtbo' \) \
-                -print
-            fi
-          done
-
-          echo "=== Artifact directory ==="
-          ls -lah artifacts
-
-      - name: Upload build artifacts
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: Jhat-Pat-LMV600${{ inputs.include_ksu == 'true' && '-KSU' || '-NoKSU' }}-${{ env.SHORT_SHA }}
-          path: artifacts/*
-          if-no-files-found: warn
-          compression-level: 0
-          retention-days: 14
-
-      - name: Final build status
-        if: always()
-        shell: bash
-        run: |
-          echo "Build finished."
-          echo "Commit: $GITHUB_SHA"
-          echo "KernelSU option: ${{ inputs.include_ksu }}"
-          echo "Check previous steps for the actual build result."
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        # Dynamic naming based on whether KSU is included
+        name: LMV600${{ github.event.inputs.include_ksu == 'true' && '-KSU-SuSFS' || '-SuSFS' }}-Kernel
+        path: |
+          *.zip
+          out/arch/arm64/boot/Image*
+          out/arch/arm64/boot/dtb*
+          out/arch/arm64/boot/dts/vendor/*.dtb
+          
+          
+          
+          
+          
+          
+          
