@@ -96,7 +96,7 @@ if [ -f "$OUT_DIR/arch/arm64/boot/Image" ]; then
     if [ $KSU_ENABLE -eq 1 ]; then
         echo "Applying KPM support patch..."
         cd $OUT_DIR/arch/arm64/boot/
-        wget https://github.com/SukiSU-Ultra/SukiSU_KernelPatch_patch/releases/download/0.12.2/patch_linux
+        wget -q https://github.com/SukiSU-Ultra/SukiSU_KernelPatch_patch/releases/download/0.13.0/patch_linux
         chmod +x patch_linux
         ./patch_linux 
         rm Image
