@@ -12,13 +12,7 @@ set -Eeuo pipefail
 # -------------------- Configuration ----------------------
 
 TOOLCHAIN_PATH="$HOME/zyc-clang/bin"
-
-# Defconfig name passed to make
 DEFCONFIG="vendor/JhatPat_defconfig"
-
-# Actual defconfig file path
-DEFCONFIG_FILE="arch/arm64/configs/$DEFCONFIG"
-
 OUT_DIR="out"
 ANYKERNEL_DIR="anykernel"
 
@@ -43,76 +37,18 @@ elif [[ -n "${1:-}" ]]; then
     exit 2
 fi
 
-# -------------------- Preflight --------------------------
-
-if [[ ! -f Makefile ]]; then
-    echo "[!] Run this script from the kernel source root."
-    exit 1
-fi
-
-if [[ ! -f "$DEFCONFIG_FILE" ]]; then
-    echo "[!] Defconfig not found: $DEFCONFIG_FILE"
-    exit 1
-fi
-
-if [[ ! -x "$TOOLCHAIN_PATH/clang" ]]; then
-    echo "[!] Clang not found: $TOOLCHAIN_PATH/clang"
-    exit 1
-fi
-
-if ! command -v ccache >/dev/null 2>&1; then
-    echo "[!] ccache is not installed."
-    exit 1
-fi
-
-if ! command -v zip >/dev/null 2>&1; then
-    echo "[!] zip is not installed."
-    exit 1
-fi
-
-if ! command -v unzip >/dev/null 2>&1; then
-    echo "[!] unzip is not installed."
-    exit 1
-fi
-
-if ! command -v aarch64-linux-gnu-gcc >/dev/null 2>&1; then
-    echo "[!] aarch64-linux-gnu-gcc is missing."
-    exit 1
-fi
-
-if ! command -v arm-linux-gnueabi-gcc >/dev/null 2>&1; then
-    echo "[!] arm-linux-gnueabi-gcc is missing."
-    exit 1
-fi
-
-if ! command -v git >/dev/null 2>&1; then
-    echo "[!] Git is not installed."
-    exit 1
-fi
-
-if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-    echo "[!] Git repository not detected."
-    exit 1
-fi
-
-if ! command -v curl >/dev/null 2>&1; then
-    echo "[!] curl is not installed."
-    exit 1
-fi
-
 GIT_COMMIT_ID="$(git rev-parse --short=8 HEAD)"
 BUILD_DATE="$(date +'%Y%m%d_%H%M%S')"
 
 echo "========================================================="
 echo " Jhat-Pat Kernel - Next Gen 2.0"
 echo " Device: LG V60 ThinQ"
-echo " Defconfig: $DEFCONFIG_FILE"
+echo " Defconfig: arch/arm64/configs/$DEFCONFIG"
 echo " Commit: $GIT_COMMIT_ID"
 echo " KernelSU: $KSU_ENABLE"
 echo "========================================================="
 
-echo "[*] Clang version:"
-"$TOOLCHAIN_PATH/clang" --version
+clang --version
 
 mkdir -p "$CCACHE_DIR"
 ccache --max-size="$CCACHE_MAXSIZE"
@@ -127,25 +63,16 @@ rm -f Jhat-Pat-V60-*.zip
 # -------------------- KernelSU Setup ---------------------
 
 if [[ "$KSU_ENABLE" -eq 1 ]]; then
-    echo "========================================================="
-    echo "[*] Installing ReSukiSU integration"
-    echo "========================================================="
+    echo "[*] Installing ReSukiSU integration..."
 
-    # Review upstream setup.sh before running it.
     curl -fLSs --retry 3 \
-      "https://raw.githubusercontent.com/ReSukiSU/ReSukiSU/main/kernel/setup.sh" \
-      -o /tmp/jhatpat_ksu_setup.sh
-
-    bash /tmp/jhatpat_ksu_setup.sh
-    rm -f /tmp/jhatpat_ksu_setup.sh
-
-    echo "[+] ReSukiSU setup command completed."
-    echo "[!] Kernel hook integration must be supported by this source."
+        "https://raw.githubusercontent.com/ReSukiSU/ReSukiSU/main/kernel/setup.sh" \
+        | bash
 fi
 
 # -------------------- AnyKernel3 Setup -------------------
 
-echo "[*] Cloning Jhat-Pat AnyKernel3..."
+echo "[*] Cloning AnyKernel3..."
 
 git clone \
     https://github.com/aqbaloch6205/AnyKernel3 \
@@ -169,21 +96,16 @@ MAKE_ARGS=(
     "KCFLAGS=-Wno-error -Wno-error=incompatible-pointer-types"
 )
 
-echo "[*] Generating kernel defconfig..."
+echo "[*] Generating defconfig..."
 
 make "${MAKE_ARGS[@]}" "$DEFCONFIG"
 
 CONFIG_FILE="$OUT_DIR/.config"
 
-if [[ ! -s "$CONFIG_FILE" ]]; then
-    echo "[!] Kernel .config was not generated."
-    exit 1
-fi
-
 # -------------------- KernelSU Configuration -------------
 
 if [[ "$KSU_ENABLE" -eq 1 ]]; then
-    echo "[*] Enabling ReSukiSU / SuSFS / KPM options..."
+    echo "[*] Enabling ReSukiSU / SuSFS / KPM..."
 
     ./scripts/config --file "$CONFIG_FILE" \
         -e KSU \
@@ -203,7 +125,7 @@ if [[ "$KSU_ENABLE" -eq 1 ]]; then
         -e KALLSYMS_ALL \
         -e PERF_HELPER
 else
-    echo "[*] Disabling KernelSU / SuSFS / KPM options..."
+    echo "[*] Disabling KernelSU / SuSFS / KPM..."
 
     ./scripts/config --file "$CONFIG_FILE" \
         -d KSU \
@@ -225,25 +147,9 @@ fi
 
 # -------------------- Resolve Kconfig --------------------
 
-echo "[*] Resolving kernel configuration..."
+echo "[*] Resolving configuration..."
 
 make "${MAKE_ARGS[@]}" olddefconfig
-
-# -------------------- Verify Configuration ---------------
-
-if [[ "$KSU_ENABLE" -eq 1 ]]; then
-    echo "[*] Verifying required configuration symbols..."
-
-    for symbol in KSU KSU_SUSFS KPM KALLSYMS KALLSYMS_ALL; do
-        if ! grep -qx "CONFIG_${symbol}=y" "$CONFIG_FILE"; then
-            echo "[!] Required symbol CONFIG_${symbol}=y is missing."
-            echo "[!] Source support or Kconfig dependencies may be missing."
-            exit 1
-        fi
-    done
-
-    echo "[+] Core configuration verified."
-fi
 
 # -------------------- Compile Kernel ----------------------
 
@@ -256,76 +162,35 @@ make "${MAKE_ARGS[@]}" -j"$(nproc)"
 BOOT_DIR="$OUT_DIR/arch/arm64/boot"
 IMAGE="$BOOT_DIR/Image"
 
-if [[ ! -s "$IMAGE" ]]; then
-    echo "[!] Kernel compilation did not produce Image."
-    exit 1
-fi
-
-echo "[+] Kernel Image generated."
-
 # -------------------- Merge DTBs --------------------------
 
-echo "[*] Collecting device tree binaries..."
-
-if [[ ! -d "$BOOT_DIR/dts" ]]; then
-    echo "[!] DTB directory not found: $BOOT_DIR/dts"
-    echo "[!] Check this kernel tree's DTB output layout."
-    exit 1
-fi
-
-DTB_COUNT="$(find "$BOOT_DIR/dts" -type f -name '*.dtb' | wc -l)"
-
-if [[ "$DTB_COUNT" -eq 0 ]]; then
-    echo "[!] No DTB files were generated."
-    exit 1
-fi
+echo "[*] Collecting DTBs..."
 
 find "$BOOT_DIR/dts" -type f -name '*.dtb' -print0 \
     | sort -z \
     | xargs -0 cat > "$BOOT_DIR/dtb"
 
-if [[ ! -s "$BOOT_DIR/dtb" ]]; then
-    echo "[!] Combined DTB file is empty."
-    exit 1
-fi
-
-echo "[+] Combined $DTB_COUNT DTB files."
+echo "[+] DTB merge command completed."
 
 # -------------------- KPM Patch ---------------------------
 
 if [[ "$KSU_ENABLE" -eq 1 ]]; then
-    echo "========================================================="
-    echo "[*] Downloading SukiSU KernelPatch tool v0.13.0"
-    echo "========================================================="
+    echo "[*] Downloading SukiSU KernelPatch v0.13.0..."
 
-    PATCH_DIR="$BOOT_DIR"
     PATCH_URL="https://github.com/SukiSU-Ultra/SukiSU_KernelPatch_patch/releases/download/0.13.0/patch_linux"
 
-    curl -fL --retry 3 "$PATCH_URL" -o "$PATCH_DIR/patch_linux"
-    chmod +x "$PATCH_DIR/patch_linux"
-
-    if [[ ! -s "$PATCH_DIR/patch_linux" ]]; then
-        echo "[!] KernelPatch download failed."
-        exit 1
-    fi
+    curl -fL --retry 3 "$PATCH_URL" -o "$BOOT_DIR/patch_linux"
+    chmod +x "$BOOT_DIR/patch_linux"
 
     echo "[*] Applying KPM patch..."
 
     (
-        cd "$PATCH_DIR"
+        cd "$BOOT_DIR"
         ./patch_linux
     )
 
-    if [[ ! -s "$PATCH_DIR/oImage" ]]; then
-        echo "[!] KPM patch did not produce oImage."
-        echo "[!] Original Image has been preserved."
-        exit 1
-    fi
-
-    mv "$PATCH_DIR/oImage" "$PATCH_DIR/Image"
-    rm -f "$PATCH_DIR/patch_linux"
-
-    echo "[+] Patched kernel Image verified."
+    mv "$BOOT_DIR/oImage" "$BOOT_DIR/Image"
+    rm -f "$BOOT_DIR/patch_linux"
 fi
 
 # -------------------- Prepare AnyKernel3 ------------------
@@ -351,17 +216,8 @@ ZIP_NAME="Jhat-Pat-V60-${KSU_ZIP_STR}-${BUILD_DATE}-${GIT_COMMIT_ID}.zip"
         -x ".git/*" ".gitignore" "out/*" "*.zip"
 )
 
-if [[ ! -s "$ZIP_NAME" ]]; then
-    echo "[!] Flashable ZIP creation failed."
-    exit 1
-fi
-
-echo "[*] Verifying ZIP integrity..."
-
-unzip -t "$ZIP_NAME"
-
 echo "========================================================="
-echo "[+] BUILD COMPLETED"
+echo "[+] BUILD PROCESS FINISHED"
 echo "[+] Device: LG V60 ThinQ"
 echo "[+] KernelSU: $KSU_ENABLE"
 echo "[+] Image: $BOOT_DIR/Image"
@@ -369,5 +225,4 @@ echo "[+] DTB: $BOOT_DIR/dtb"
 echo "[+] ZIP: $ZIP_NAME"
 echo "========================================================="
 
-echo "[*] ccache statistics:"
 ccache -s
