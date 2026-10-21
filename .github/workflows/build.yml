@@ -41,14 +41,14 @@ jobs:
           ${{ runner.os }}-ccache-v60-${{ github.event.inputs.include_ksu }}-
           ${{ runner.os }}-ccache-v60-
 
-    - name: Setup zyc-clang toolchain
+    - name: Download and Setup ZyC-Clang 16 Toolchain
       run: |
         mkdir -p $HOME/zyc-clang
         cd $HOME/zyc-clang
-        # Using Zyc-Clang 15 (Standard for many Snapdragon 865 kernels)
-        wget https://github.com/ZyCromerZ/Clang/releases/download/15.0.7-20251111-release/Clang-15.0.7-20251111.tar.gz
-        tar -zxvf Clang-15.0.7-20251111.tar.gz
-        cd $GITHUB_WORKSPACE
+        wget -q https://github.com/ZyCromerZ/Clang/releases/download/16.0.6-20260510-release/Clang-16.0.6-20260510.tar.gz
+        tar -zxvf Clang-16.0.6-20260510.tar.gz
+        rm -f Clang-16.0.6-20260510.tar.gz
+        echo "$HOME/zyc-clang/bin" >> $GITHUB_PATH
 
     - name: Build kernel
       run: |
